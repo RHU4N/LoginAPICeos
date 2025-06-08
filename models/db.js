@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 // Conexão com o banco de dados MongoDB
-    mongoose.connect('mongodb+srv://leoT:fjdhVv8XH5EMzskv@projetointegrador.cslcrjh.mongodb.net/PI', {
+    mongoose.connect('mongodb+srv://Rhuan:root@ceos.htu7dfp.mongodb.net/?retryWrites=true&w=majority&appName=Ceos', {
     });
 // Obter a conexão padrão do Mongoose
     const db = mongoose.connection;
