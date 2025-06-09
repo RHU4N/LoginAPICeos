@@ -4,6 +4,18 @@ const User = require("../models/User");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+// Middleware para autenticação JWT
+function auth(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token não fornecido' });
+    jwt.verify(token, 'seuSegredoJWT', (err, user) => {
+        if (err) return res.status(403).json({ error: 'Token inválido' });
+        req.userId = user.id;
+        next();
+    });
+}
+
 // Busca todos os proprietários (GET)
 router.get('/', async (req, res) => {
     try {
@@ -80,6 +92,34 @@ router.put('/:id', async (req, res) => {
         }
         await User.findByIdAndUpdate(req.params.id, updateData);
         res.status(200).json({ message: 'Atualizado com sucesso' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Adiciona um item ao histórico do usuário autenticado
+router.post('/historico', auth, async (req, res) => {
+    try {
+        const { tipo, valores, resultado } = req.body;
+        if (!tipo || !valores || !resultado) {
+            return res.status(400).json({ error: 'Campos obrigatórios faltando' });
+        }
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+        user.historico.push({ tipo, valores, resultado });
+        await user.save();
+        res.status(201).json({ message: 'Histórico salvo com sucesso' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Retorna o histórico do usuário autenticado
+router.get('/historico', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('historico');
+        if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+        res.status(200).json(user.historico);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
