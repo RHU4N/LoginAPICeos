@@ -35,7 +35,7 @@ package.json
 2. Configure a string de conexão do MongoDB em `src/infrastructure/db/db.js` se necessário.
 3. Inicie o servidor:
    ```bash
-   npm start
+   npx nodemon index.js
    ```
    ou
    ```bash
