@@ -3,8 +3,9 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 8081;
-const userController =
-    require('./controllers/UserController.js');
+// Inicializa conexão com o banco
+require('./src/infrastructure/db/db');
+const userController = require('./src/interfaces/controllers/UserController');
 // Middleware para tratar JSON
 app.use(bodyParser.json());
 // Middleware para habilitar o CORS
