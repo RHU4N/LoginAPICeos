@@ -1,5 +1,7 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const {
+    UserNotFoundError,
+    MissingFieldsError,
+} = require('../errors/UserErrors')
 
 class UserUseCases {
     constructor(userRepository, passwordHasher) {
@@ -16,13 +18,15 @@ class UserUseCases {
     }
 
     async getUserById(id) {
-        return await this.userRepository.findById(id);
+        const user = await this.userRepository.findById(id);
+        if (!user) throw new UserNotFoundError();
+        return user;
     }
 
     async registerUser(data) {
         const { nome, email, senha, telefone, assinante, historico } = data;
         if (!nome || !email || !senha || !telefone) {
-            throw new Error('Campos obrigatórios faltando');
+            throw new MissingFieldsError();
         }
         const hashedSenha = await this.passwordHasher.hash(senha);
         return await this.userRepository.create({ nome, email, senha: hashedSenha, telefone, assinante, historico });

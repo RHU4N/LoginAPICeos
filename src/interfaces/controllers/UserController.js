@@ -1,3 +1,5 @@
+const { UserErrors } = require('../../application/errors/UserErrors');
+
 class UserController {
   constructor(userUseCases) {
     this.userUseCases = userUseCases;
@@ -8,7 +10,7 @@ class UserController {
       const users = await this.userUseCases.getAllUsers();
       res.status(200).json(users);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -17,7 +19,7 @@ class UserController {
       const user = await this.userUseCases.getUserById(req.params.id);
       res.status(200).json(user);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -26,7 +28,7 @@ class UserController {
       await this.userUseCases.registerUser(req.body);
       res.status(201).json({ message: "Cadastrado com sucesso" });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -35,7 +37,7 @@ class UserController {
       await this.userUseCases.updateUser(req.params.id, req.body);
       res.status(200).json({ message: "Atualizado com sucesso" });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -44,7 +46,7 @@ class UserController {
       await this.userUseCases.deleteUser(req.params.id);
       res.status(200).json({ message: "Excluído com sucesso" });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -57,7 +59,7 @@ class UserController {
       await this.userUseCases.addHistorico(req.userId, { tipo, valores, resultado });
       res.status(201).json({ message: "Histórico salvo com sucesso" });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
   }
 
@@ -66,8 +68,17 @@ class UserController {
       const historico = await this.userUseCases.getHistorico(req.userId);
       res.status(200).json(historico);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      this.handleError(err, res);
     }
+  }
+
+  // Tratamento de erros para os Users
+  handleError(err, res) {
+    if (err instanceof UserErrors){
+      return res.status(err.statusCode).json({ error: err.message });
+    }
+    console.error("Erro inesperado: ", err);
+    return res.status(500).json({ error: "Erro interno no servidor" });
   }
 }
 
