@@ -1,3 +1,5 @@
+require('dotenv').config(); // Certifique-se de que esta linha está no início do arquivo
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -15,8 +17,8 @@ app.use(cors());
 app.get('/', (req, res) => res.send('Estou aqui'));
 
 // Importa rotas (interface_adapters/routes)
-const userRoutes = require('./src/interface_adapters/routes/userRoutes');
-const authRoutes = require('./src/interface_adapters/routes/authRoutes');
+const userRoutes = require('./src/interfaces/routes/UserRoutes');
+const authRoutes = require('./src/interfaces/routes/AuthRoutes');
 
 // Usa as rotas
 app.use('/users', userRoutes); // CRUD de usuários

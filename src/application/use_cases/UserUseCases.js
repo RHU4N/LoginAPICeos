@@ -14,7 +14,7 @@ class UserUseCases {
     }
 
     async getUserByEmail(email) {
-        return await this.userRepository.findOne({ email });
+        return await this.userRepository.findByEmail(email);
     }
 
     async getUserById(id) {

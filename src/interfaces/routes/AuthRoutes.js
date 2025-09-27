@@ -13,6 +13,6 @@ const tokenProvider = new JwtTokenProvider();
 const loginUseCase = new LoginUseCase(userUseCases, passwordHasher, tokenProvider);
 const authController = new AuthController(loginUseCase);
 
-router.post('/login', authController.login);
+router.post('/login', (req, res) => authController.login(req, res));
 
 module.exports = router;

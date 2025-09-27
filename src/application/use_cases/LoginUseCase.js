@@ -16,7 +16,7 @@ class LoginUseCase {
       throw new MissingCredentialsError();
     }
 
-    const user = await this.userUseCases.findByEmail(email);
+    const user = await this.userUseCases.getUserByEmail(email);
     if (!user) throw new UserNotFoundError();
 
     const valid = await this.passwordHasher.compare(senha, user.senha);

@@ -9,13 +9,13 @@ class UserErrors extends Error{
     }
 }
 
-class UserNotFoundError extends UserError {
+class UserNotFoundError extends UserErrors {
     constructor(message = "Usuário não encontrado") {
         super(message, 404);
     }
 }
 
-class MissingFieldsError extends UserError {
+class MissingFieldsError extends UserErrors {
     constructor(message = "Campos obrigatórios faltando") {
         super(message, 400);
     }
