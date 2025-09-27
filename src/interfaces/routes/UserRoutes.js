@@ -4,9 +4,11 @@ const UserController = require('../controllers/UserController');
 const UserRepositoryImpl = require('../../infrastructure/repositories/UserRepositoryImpl');
 const UserUseCases = require('../../application/use_cases/UserUseCases');
 const auth = require('../../infrastructure/middleware/AuthMiddleware');
+const BcryptPasswordHasher = require('../../infrastructure/providers/BcryptPasswordHasher');
 
 const userRepository = new UserRepositoryImpl();
-const userUseCases = new UserUseCases(userRepository);
+const passwordHasher = new BcryptPasswordHasher();
+const userUseCases = new UserUseCases(userRepository, passwordHasher);
 const userController = new UserController(userUseCases);
 
 router.get('/', (req, res) => userController.getAll(req, res));
