@@ -16,12 +16,16 @@ src/
     entities/
     repositories/
   application/
+    errors/
     use_cases/
   infrastructure/
     db/
+    middleware/
+    providers/
     repositories/
   interfaces/
     controllers/
+    routes/
 index.js
 package.json
 ```
