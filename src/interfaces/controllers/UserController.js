@@ -72,6 +72,23 @@ class UserController {
     }
   }
 
+  async login(req, res) {
+    try {
+      const { email, senha } = req.body;
+      if (!email || !senha) {
+        return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+      }
+
+      const result = await this.userUseCases.login(email, senha);
+      res.status(200).json(result);
+    } catch (err) {
+      if (err.message === 'Credenciais inválidas') {
+        return res.status(401).json({ error: err.message });
+      }
+      this.handleError(err, res);
+    }
+  }
+
   // Tratamento de erros para os Users
   handleError(err, res) {
     if (err instanceof UserErrors){

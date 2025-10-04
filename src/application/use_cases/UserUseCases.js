@@ -2,6 +2,7 @@ const {
     UserNotFoundError,
     MissingFieldsError,
 } = require('../errors/UserErrors')
+const jwt = require('jsonwebtoken'); // Importando jsonwebtoken
 
 class UserUseCases {
     constructor(userRepository, passwordHasher) {
@@ -50,6 +51,24 @@ class UserUseCases {
 
     async getHistorico(userId) {
         return await this.userRepository.getHistorico(userId);
+    }
+
+    async login(email, senha) {
+        const user = await this.userRepository.findByEmail(email);
+        if (!user) {
+            throw new UserNotFoundError();
+        }
+
+        const isPasswordValid = await this.passwordHasher.compare(senha, user.senha);
+        if (!isPasswordValid) {
+            throw new Error('Credenciais inválidas');
+        }
+
+        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
+            expiresIn: '1h',
+        });
+
+        return { token, user: { id: user._id, email: user.email, nome: user.nome } };
     }
 }
 
