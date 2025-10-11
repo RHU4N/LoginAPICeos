@@ -25,10 +25,14 @@ app.get('/', (req, res) => res.send('Estou aqui'));
 // Importa rotas (interface_adapters/routes)
 const userRoutes = require('./src/interfaces/routes/UserRoutes');
 const authRoutes = require('./src/interfaces/routes/AuthRoutes');
+const { setupSwagger } = require('./swagger/swaggerDocs');
 
 // Usa as rotas
 app.use('/users', userRoutes); // CRUD de usuários
 app.use('/auth', authRoutes);  // login / verify
+
+// Swagger (docs)
+setupSwagger(app);
 
 // Middleware global de erro com mapeamento de erros de domínio
 app.use((err, req, res, next) => {

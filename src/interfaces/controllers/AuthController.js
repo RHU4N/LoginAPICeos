@@ -1,4 +1,10 @@
 // Controller de Autenticação (Login)
+/**
+ * @openapi
+ * tags:
+ *   - name: Auth
+ *     description: Endpoints de autenticação
+ */
 class AuthController {
     constructor(loginUseCase) {
         this.loginUseCase = loginUseCase;
