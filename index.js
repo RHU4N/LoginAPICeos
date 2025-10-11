@@ -6,6 +6,12 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 8081;
 
+// Fail fast if required env is missing
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET não está definido. Verifique o arquivo .env ou as variáveis de ambiente.');
+  process.exit(1);
+}
+
 // Inicializa conexão com o banco
 require('./src/infrastructure/db/db');
 
@@ -24,10 +30,13 @@ const authRoutes = require('./src/interfaces/routes/AuthRoutes');
 app.use('/users', userRoutes); // CRUD de usuários
 app.use('/auth', authRoutes);  // login / verify
 
-// Middleware global de erro
+// Middleware global de erro com mapeamento de erros de domínio
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Algo deu errado!');
+  console.error(err && err.stack ? err.stack : err);
+  // Errors from domain layer may expose a `status` property or `name`
+  const status = err && err.status ? err.status : (err && err.name === 'ValidationError' ? 422 : 500);
+  const message = (err && err.publicMessage) || (err && err.message) || 'Internal Server Error';
+  res.status(status).json({ success: false, error: { message } });
 });
 
 // Iniciar servidor
