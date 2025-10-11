@@ -5,7 +5,7 @@ class JwtTokenProvider {
     if (!process.env.JWT_SECRET) {
       throw new Error('Erro: JWT_SECRET não está definido no arquivo .env');
     }
-    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5h" });
   }
 
   verify(token) {
