@@ -15,7 +15,7 @@ const authController = new AuthController(loginUseCase);
 
 /**
  * @openapi
- * /login:
+ * /auth/login:
  *   post:
  *     tags: [Auth]
  *     summary: Executa login.
