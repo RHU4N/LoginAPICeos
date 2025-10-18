@@ -10,8 +10,14 @@ const userUseCases = new UserUseCases(userRepository);
 
 const passwordHasher = new BcryptPasswordHasher();
 const tokenProvider = new JwtTokenProvider();
-const loginUseCase = new LoginUseCase(userUseCases, passwordHasher, tokenProvider);
+const TokenStoreRepository = require('../../infrastructure/repositories/TokenStoreRepository');
+const tokenStoreRepository = new TokenStoreRepository();
+const loginUseCase = new LoginUseCase(userUseCases, passwordHasher, tokenProvider, tokenStoreRepository);
 const authController = new AuthController(loginUseCase);
+const LogoutUseCase = require('../../application/use_cases/LogoutUseCase');
+const LogoutController = require('../controllers/LogoutController');
+const logoutUseCase = new LogoutUseCase(tokenStoreRepository);
+const logoutController = new LogoutController(logoutUseCase);
 
 /**
  * @openapi
@@ -93,5 +99,6 @@ const authController = new AuthController(loginUseCase);
  *                   example: Erro interno no servidor
  */
 router.post('/login', (req, res) => authController.login(req, res));
+router.post('/logout', (req, res) => logoutController.logout(req, res));
 
 module.exports = router;
