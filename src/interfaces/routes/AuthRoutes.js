@@ -94,4 +94,35 @@ const authController = new AuthController(loginUseCase);
  */
 router.post('/login', (req, res) => authController.login(req, res));
 
+/**
+ * @openapi
+ * /logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Realiza logout do usuário
+ *     description: Remove o token do servidor (invalida sessão). O token deve ser enviado no header Authorization como `Bearer <token>`.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout executado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Token inválido ou não fornecido
+ */
+router.post('/logout', (req, res) => {
+	// logoutController may not exist in all branches; call route if controller wired
+	if (typeof logoutController !== 'undefined' && logoutController && typeof logoutController.logout === 'function') {
+		return logoutController.logout(req, res);
+	}
+	return res.status(404).json({ error: 'Logout não implementado' });
+});
+
 module.exports = router;

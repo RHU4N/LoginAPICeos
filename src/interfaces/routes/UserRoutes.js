@@ -363,6 +363,8 @@ router.delete('/:id', (req, res) => userController.delete(req, res));
  * /historico:
  *   post:
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     summary: Adiciona operação ao histórico do usuário
  *     description: Operação matemática é adicionada ao histórico do usuário.
  *     requestBody:
@@ -417,6 +419,8 @@ router.post('/historico', auth, (req, res) => userController.addHistorico(req, r
  * /historico:
  *   get:
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     summary: Retorna histórico do usuário
  *     description: Lista as operações matemáticas realizadas pelo usuário.
  *     requestBody:
