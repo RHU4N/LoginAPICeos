@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: loginAPI
+    env: node
+    region: oregon
+    plan: free
+    repo: https://github.com/<your-org>/loginAPI
+    branch: master
+    buildCommand: npm ci && npm run build --if-present
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8081
