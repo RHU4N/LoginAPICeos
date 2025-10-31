@@ -5,4 +5,4 @@ RUN npm ci --only=production
 COPY . .
 EXPOSE 8081
 ENV NODE_ENV=production
-CMD ["node", "index.js"]
+CMD ["npm", "run", "dev"]
