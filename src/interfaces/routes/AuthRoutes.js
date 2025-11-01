@@ -117,12 +117,35 @@ router.post('/login', (req, res) => authController.login(req, res));
  *       401:
  *         description: Token inválido ou não fornecido
  */
-router.post('/logout', (req, res) => {
-	// logoutController may not exist in all branches; call route if controller wired
-	if (typeof logoutController !== 'undefined' && logoutController && typeof logoutController.logout === 'function') {
-		return logoutController.logout(req, res);
+// logout route implemented below
+
+// Implement logout: revoke the token by adding it to a blacklist collection
+const TokenRepository = require('../../infrastructure/repositories/TokenRepository');
+const tokenRepo = new TokenRepository();
+const jwt = require('jsonwebtoken');
+
+router.post('/logout', async (req, res) => {
+	try {
+		const authHeader = req.headers['authorization'];
+		const token = authHeader && authHeader.split(' ')[1];
+		if (!token) return res.status(400).json({ error: 'Token não fornecido' });
+
+		// Try to decode token to obtain exp. Use decode to avoid failing on already-invalid tokens.
+		const decoded = jwt.decode(token);
+		if (!decoded || !decoded.exp) {
+			// If no exp, still store token for a short time (1 hour)
+			const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+			await tokenRepo.add(token, expiresAt);
+			return res.json({ success: true });
+		}
+
+		const expiresAt = new Date(decoded.exp * 1000);
+		await tokenRepo.add(token, expiresAt);
+		return res.json({ success: true });
+	} catch (err) {
+		console.error('Logout error', err);
+		return res.status(500).json({ error: 'Erro ao processar logout' });
 	}
-	return res.status(404).json({ error: 'Logout não implementado' });
 });
 
 module.exports = router;

@@ -72,6 +72,48 @@ class UserController {
     }
   }
 
+  async exportHistorico(req, res) {
+    try {
+      const format = (req.query.format || 'json').toLowerCase();
+      const historico = await this.userUseCases.getHistorico(req.userId);
+
+      if (!historico) return res.status(404).json({ error: 'Histórico não encontrado' });
+
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(JSON.stringify(historico));
+      }
+
+      if (format === 'csv') {
+        // Convert to CSV
+        const header = ['tipo', 'valores', 'resultado', 'data'];
+        const rows = historico.map(h => (
+          [
+            '"' + String(h.tipo || '') + '"',
+            '"' + String(h.valores || '') + '"',
+            '"' + String(h.resultado || '') + '"',
+            '"' + (h.data ? new Date(h.data).toISOString() : '') + '"'
+          ].join(',')
+        ));
+        const csv = header.join(',') + '\n' + rows.join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="historico.csv"');
+        return res.send(csv);
+      }
+
+      if (format === 'txt') {
+        const txt = historico.map(h => `Tipo: ${h.tipo} | Valores: ${h.valores} | Resultado: ${h.resultado} | Data: ${h.data ? new Date(h.data).toISOString() : ''}`).join('\n');
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', 'attachment; filename="historico.txt"');
+        return res.send(txt);
+      }
+
+      return res.status(400).json({ error: 'Formato inválido. Use json, csv ou txt' });
+    } catch (err) {
+      this.handleError(err, res);
+    }
+  }
+
   async login(req, res) {
     try {
       const { email, senha } = req.body;

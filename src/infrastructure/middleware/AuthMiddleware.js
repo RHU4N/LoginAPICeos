@@ -1,17 +1,29 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
+const TokenRepository = require('../repositories/TokenRepository');
 
-function auth(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+const tokenRepo = new TokenRepository();
 
-  if (!token) return res.status(401).json({ error: "Token não fornecido" });
+async function auth(req, res, next) {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Token inválido" });
+    if (!token) return res.status(401).json({ error: 'Token não fornecido' });
 
-    req.userId = user.id;
-    next();
-  });
+    // Check blacklist first
+    const blacklisted = await tokenRepo.isBlacklisted(token);
+    if (blacklisted) return res.status(403).json({ error: 'Token inválido' });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) return res.status(403).json({ error: 'Token inválido' });
+
+      req.userId = user.id;
+      next();
+    });
+  } catch (err) {
+    console.error('Auth middleware error', err);
+    return res.status(500).json({ error: 'Erro no servidor de autenticação' });
+  }
 }
 
 module.exports = auth;

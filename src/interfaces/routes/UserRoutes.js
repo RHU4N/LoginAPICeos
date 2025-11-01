@@ -469,4 +469,7 @@ router.post('/historico', auth, (req, res) => userController.addHistorico(req, r
  */
 router.get('/historico', auth, (req, res) => userController.getHistorico(req, res));
 
+// Export histórico in multiple formats: ?format=json|csv|txt
+router.get('/historico/export', auth, (req, res) => userController.exportHistorico(req, res));
+
 module.exports = router;
