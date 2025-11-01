@@ -72,6 +72,15 @@ class UserController {
     }
   }
 
+  async clearHistorico(req, res) {
+    try {
+      await this.userUseCases.clearHistorico(req.userId);
+      res.status(200).json({ message: "Histórico limpo com sucesso" });
+    } catch (err) {
+      this.handleError(err, res);
+    }
+  }
+
   async login(req, res) {
     try {
       const { email, senha } = req.body;

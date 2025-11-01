@@ -8,5 +8,6 @@ class UserRepository {
     async delete(id) { throw new Error('Not implemented'); }
     async addHistorico(userId, historico) { throw new Error('Not implemented'); }
     async getHistorico(userId) { throw new Error('Not implemented'); }
+    async clearHistorico(userId) { throw new Error('Not implemented'); }
 }
 module.exports = UserRepository;

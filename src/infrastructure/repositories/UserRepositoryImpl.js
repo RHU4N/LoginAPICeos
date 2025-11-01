@@ -32,6 +32,13 @@ class UserRepositoryImpl extends UserRepository {
         const user = await User.findById(userId).select('historico');
         return user ? user.historico : null;
     }
+    async clearHistorico(userId) {
+        const user = await User.findById(userId);
+        if (!user) return null;
+        user.historico = [];
+        await user.save();
+        return user;
+    }
 }
 
 module.exports = UserRepositoryImpl;

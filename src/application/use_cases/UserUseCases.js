@@ -53,6 +53,10 @@ class UserUseCases {
         return await this.userRepository.getHistorico(userId);
     }
 
+    async clearHistorico(userId) {
+        return await this.userRepository.clearHistorico(userId);
+    }
+    
     async login(email, senha) {
         const user = await this.userRepository.findByEmail(email);
         if (!user) {
