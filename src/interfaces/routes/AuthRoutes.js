@@ -18,6 +18,7 @@ const authController = new AuthController(loginUseCase);
  * /auth/login:
  *   post:
  *     tags: [Auth]
+ *     x-internal: true
  *     summary: Executa login.
  *     description: Recebe `email`,`senha` e realiza login.
  *     requestBody:

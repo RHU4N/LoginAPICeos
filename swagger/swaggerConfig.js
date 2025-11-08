@@ -18,6 +18,63 @@ const swaggerDefinition = {
         scheme: 'bearer',
         bearerFormat: 'JWT'
       }
+    },
+    responses: {
+      BadRequest: {
+        description: 'Requisição inválida',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { error: { type: 'string', example: 'Parâmetros inválidos ou ausentes' } }
+            }
+          }
+        }
+      },
+      Unauthorized: {
+        description: 'Não autorizado',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { error: { type: 'string', example: 'Token não fornecido' } }
+            }
+          }
+        }
+      },
+      Forbidden: {
+        description: 'Proibido',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { error: { type: 'string', example: 'Acesso negado' } }
+            }
+          }
+        }
+      },
+      NotFound: {
+        description: 'Não encontrado',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { error: { type: 'string', example: 'Recurso não encontrado' } }
+            }
+          }
+        }
+      },
+      InternalError: {
+        description: 'Erro interno no servidor',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { error: { type: 'string', example: 'Erro interno no servidor' } }
+            }
+          }
+        }
+      }
     }
   },
   security: [ { bearerAuth: [] } ]

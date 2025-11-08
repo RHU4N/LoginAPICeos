@@ -72,6 +72,26 @@ class UserController {
     }
   }
 
+  async clearHistorico(req, res) {
+    try {
+      const historico = await this.userUseCases.clearHistorico(req.userId);
+      return res.status(200).json({ message: 'Histórico removido com sucesso', historico });
+    } catch (err) {
+      this.handleError(err, res);
+    }
+  }
+
+  async deleteHistoricoItem(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) return res.status(400).json({ error: 'ID do histórico é obrigatório' });
+      const historico = await this.userUseCases.deleteHistoricoItem(req.userId, id);
+      return res.status(200).json({ message: 'Item do histórico removido com sucesso', historico });
+    } catch (err) {
+      this.handleError(err, res);
+    }
+  }
+
   async login(req, res) {
     try {
       const { email, senha } = req.body;

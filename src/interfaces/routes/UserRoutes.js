@@ -22,6 +22,7 @@ const userController = new UserController(userUseCases);
  * /users:
  *   get:
  *     tags: [Users]
+ *     x-internal: true
  *     summary: Listar usuários
  *     description: Lista todos os usuários cadastrados
  *     responses:
@@ -172,6 +173,7 @@ router.post('/', (req, res) => userController.create(req, res));
  * /users/{id}:
  *   get:
  *     tags: [Users]
+ *     x-internal: true
  *     summary: Buscar usuário por id
  *     description: Realiza busca de usuário filtrada por `Id`.
  *     parameters:
@@ -468,5 +470,57 @@ router.post('/historico', auth, (req, res) => userController.addHistorico(req, r
  *                   example: Erro interno no servidor
  */
 router.get('/historico', auth, (req, res) => userController.getHistorico(req, res));
+
+/**
+ * @openapi
+ * /historico:
+ *   delete:
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Deleta todo o histórico do usuário
+ *     description: Remove todas as entradas do histórico do usuário autenticado.
+ *     responses:
+ *       200:
+ *         description: Histórico removido com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Histórico removido com sucesso
+ */
+router.delete('/historico', auth, (req, res) => userController.clearHistorico(req, res));
+
+/**
+ * @openapi
+ * /historico/{id}:
+ *   delete:
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Deleta item do histórico por id
+ *     description: Remove uma entrada específica do histórico do usuário autenticado.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Item removido com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Item do histórico removido com sucesso
+ */
+router.delete('/historico/:id', auth, (req, res) => userController.deleteHistoricoItem(req, res));
 
 module.exports = router;

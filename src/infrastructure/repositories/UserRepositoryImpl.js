@@ -32,6 +32,25 @@ class UserRepositoryImpl extends UserRepository {
         const user = await User.findById(userId).select('historico');
         return user ? user.historico : null;
     }
+    async clearHistorico(userId) {
+        // Remove all historico entries for the user
+        const updated = await User.findByIdAndUpdate(
+            userId,
+            { $set: { historico: [] } },
+            { new: true }
+        ).select('historico');
+        return updated ? updated.historico : null;
+    }
+
+    async deleteHistoricoItem(userId, historicoId) {
+        // Pull the subdocument with the provided _id from historico
+        const updated = await User.findByIdAndUpdate(
+            userId,
+            { $pull: { historico: { _id: historicoId } } },
+            { new: true }
+        ).select('historico');
+        return updated ? updated.historico : null;
+    }
 }
 
 module.exports = UserRepositoryImpl;
