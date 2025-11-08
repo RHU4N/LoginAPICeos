@@ -12,8 +12,10 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
-// Inicializa conexão com o banco
-require('./src/infrastructure/db/db');
+// Inicializa conexão com o banco (skip when running tests)
+if (process.env.NODE_ENV !== 'test') {
+  require('./src/infrastructure/db/db');
+}
 
 // Middlewares globais
 app.use(bodyParser.json());
@@ -43,5 +45,9 @@ app.use((err, req, res, next) => {
   res.status(status).json({ success: false, error: { message } });
 });
 
-// Iniciar servidor
-app.listen(port, () => console.log(`Servidor rodando na porta ${port}!`));
+// Start server only if run directly. This allows tests to require the app without starting a listener.
+if (require.main === module) {
+  app.listen(port, () => console.log(`Servidor rodando na porta ${port}!`));
+}
+
+module.exports = app;
