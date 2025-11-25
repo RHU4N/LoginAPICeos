@@ -2,9 +2,9 @@ name: CI - loginAPI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 jobs:
   build:
@@ -15,13 +15,38 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+      - name: Ensure JWT_SECRET and MONGO_URI are available
+        run: |
+          if [ -z "${{ secrets.JWT_SECRET }}" ] || [ -z "${{ secrets.MONGO_URI }}" ]; then
+            echo "::error::Required secrets JWT_SECRET or MONGO_URI are not set. Aborting tests."
+            repo="${{ github.repository }}"
+            pr_number="${{ github.event.pull_request.number }}"
+            title="[CI] Tests failed: missing secrets"
+            body="The CI test step could not run because required secrets are not set for workflow ${{ github.workflow }} on ref ${{ github.ref }}.\n\nActor: ${{ github.actor }}"
+            if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"body\": \"${body}\"}" \
+                "https://api.github.com/repos/${repo}/issues/${pr_number}/comments" || true
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d '["ci-failed"]' "https://api.github.com/repos/${repo}/issues/${pr_number}/labels" || true
+            else
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"title\": \"${title}\", \"body\": \"${body}\", \"labels\": [\"ci-failed\"] }" \
+                "https://api.github.com/repos/${repo}/issues" || true
+            fi
+            exit 1
+          fi
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+          echo "mongoUri=${{ secrets.MONGO_URI }}" >> $GITHUB_ENV
       - name: Install
         run: npm ci
+      - name: Run tests
+        run: npm test -- --runInBand
       - name: Run build (if any)
         run: npm run build --if-present
 
   trigger-render-deploy:
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -31,11 +56,102 @@ jobs:
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
           if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
-            echo "Render deploy skipped because secrets are not set";
-            exit 0;
+            echo "::error::RENDER_API_KEY or RENDER_SERVICE_ID secret is not set. Aborting deploy."
+            repo="${{ github.repository }}"
+            pr_number="${{ github.event.pull_request.number }}"
+            title="[CI] Render deploy failed: missing secrets"
+            body="RENDER_API_KEY or RENDER_SERVICE_ID is not set for workflow ${{ github.workflow }} on ref ${{ github.ref }}.\n\nActor: ${{ github.actor }}"
+            if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+              echo "Posting comment to PR ${pr_number}"
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"body\": \"${body}\"}" \
+                "https://api.github.com/repos/${repo}/issues/${pr_number}/comments" || true
+              echo "Adding label 'ci-failed' to PR ${pr_number}"
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d '["ci-failed"]' "https://api.github.com/repos/${repo}/issues/${pr_number}/labels" || true
+            else
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"title\": \"${title}\", \"body\": \"${body}\", \"labels\": [\"ci-failed\"] }" \
+                "https://api.github.com/repos/${repo}/issues" || true
+            fi
+            exit 1;
           fi
           echo "Triggering deploy for service $RENDER_SERVICE_ID"
-          curl -sS -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+          http_code=$(curl -s -o /tmp/render_resp -w "%{http_code}" -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"clearCache": false}'
+            -d '{"clearCache": false}' || true)
+          echo "--- Render response body ---"
+          cat /tmp/render_resp || true
+          echo "--- end response ---"
+          echo "Render response HTTP status: $http_code"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Render deploy returned non-2xx status: $http_code"
+            repo="${{ github.repository }}"
+            pr_number="${{ github.event.pull_request.number }}"
+            title="[CI] Render deploy failed: webhook returned $http_code"
+            body="Render deploy webhook returned HTTP status $http_code for workflow ${{ github.workflow }} on ref ${{ github.ref }}. Check the workflow logs for full response.\n\nActor: ${{ github.actor }}"
+            if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+              echo "Posting comment to PR ${pr_number}"
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"body\": \"${body}\"}" \
+                "https://api.github.com/repos/${repo}/issues/${pr_number}/comments" || true
+              echo "Adding label 'ci-failed' to PR ${pr_number}"
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d '["ci-failed"]' "https://api.github.com/repos/${repo}/issues/${pr_number}/labels" || true
+            else
+              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+                -d "{\"title\": \"${title}\", \"body\": \"${body}\", \"labels\": [\"ci-failed\"] }" \
+                "https://api.github.com/repos/${repo}/issues" || true
+            fi
+            exit 1
+          fi
+
+    newman-login:
+      name: Newman - Login tests
+      needs: build
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Use Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: '18'
+
+        - name: Install dependencies (loginAPI)
+          run: |
+            cd loginAPI
+            npm ci
+
+        - name: Ensure required secrets present
+          run: |
+            if [ -z "${{ secrets.JWT_SECRET }}" ] || [ -z "${{ secrets.MONGO_URI }}" ]; then
+              echo "::error::Required secrets JWT_SECRET or MONGO_URI are not set. Aborting Newman tests."
+              exit 1
+            fi
+
+        - name: Start loginAPI server
+          working-directory: ./loginAPI
+          env:
+            mongoUri: ${{ secrets.MONGO_URI }}
+            JWT_SECRET: ${{ secrets.JWT_SECRET }}
+            PORT: 8081
+            NODE_ENV: development
+          run: |
+            node index.js &
+            n=0
+            until curl -sSf http://localhost:8081/ >/dev/null 2>&1 || [ $n -ge 30 ]; do
+              n=$((n+1))
+              echo "waiting for server... $n"
+              sleep 1
+            done
+            if [ $n -ge 30 ]; then
+              echo "Server did not start in time"
+              exit 1
+            fi
+
+        - name: Run Newman collection (login)
+          working-directory: ./loginAPI
+          run: |
+            npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail
