@@ -2,9 +2,9 @@ name: CI - loginAPI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, devops ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master, main, devops ]
 
 jobs:
   build:
