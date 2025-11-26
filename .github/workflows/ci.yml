@@ -107,7 +107,7 @@ jobs:
 
   infra-tests:
     name: Infra Tests - loginAPI (start-with-memory + Newman)
-    needs: build
+      needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -201,6 +201,83 @@ jobs:
           path: server.log
 
       - name: Stop memory-backed app
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm -f server.pid
+          fi
+
+  newman-login:
+    name: Newman - Login tests (integration)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (loginAPI)
+        run: |
+          npm install --no-audit --no-fund
+
+      - name: Ensure required secrets/vars present (double-check)
+        run: |
+          if [ -z "${{ secrets.JWT_SECRET }}" ] && [ -z "${{ vars.JWT_SECRET }}" ]; then
+            echo "::error::Required secret/var JWT_SECRET is not set. Aborting Newman tests."
+            exit 1
+          fi
+          if [ -z "${{ secrets.MONGO_URI }}" ] && [ -z "${{ vars.MONGO_URI }}" ]; then
+            echo "::error::Required secret/var MONGO_URI is not set. Aborting Newman tests."
+            exit 1
+          fi
+
+      - name: Start loginAPI server (integration)
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI || vars.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+          PORT: 8081
+          NODE_ENV: development
+        run: |
+          touch server.log || true
+          node index.js > ./server.log 2>&1 &
+          echo $! > server.pid
+          n=0
+          until curl -sSf http://localhost:8081/ >/dev/null 2>&1 || [ $n -ge 30 ]; do
+            n=$((n+1))
+            echo "waiting for server... $n"
+            sleep 1
+          done
+          if [ $n -ge 30 ]; then
+            echo "Server did not start in time"
+            echo "---- server.log ----"
+            tail -n 200 ./server.log || true
+            exit 1
+          fi
+
+      - name: Run Newman collection (login)
+        run: |
+          echo "---- server.log (head) ----"
+          head -n 200 ./server.log || true
+          npm install newman --no-save
+          npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail || {
+            echo "Newman failed; dumping server.log";
+            echo "---- server.log (full) ----";
+            tail -n +1 ./server.log || true;
+            exit 1;
+          }
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-integration-server-log
+          path: server.log
+
+      - name: Stop integration server
         if: always()
         run: |
           if [ -f server.pid ]; then
