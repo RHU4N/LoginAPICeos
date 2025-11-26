@@ -1,0 +1,46 @@
+name: Performance - loginAPI (k6 smoke)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      # optional mongo service if you want to run against a local infra during perf
+      # mongo:
+      #   image: mongo:6.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        run: |
+          TARGET="${{ secrets.CEOS_LOGIN_API_URL }}"
+          if [ -z "$TARGET" ]; then TARGET="${{ vars.CEOS_LOGIN_API_URL }}"; fi
+          if [ -z "$TARGET" ]; then TARGET="${{ secrets.LOGIN_URL }}"; fi
+          if [ -z "$TARGET" ]; then TARGET="${{ vars.LOGIN_URL }}"; fi
+          if [ -z "$TARGET" ]; then echo "ERROR: No LOGIN_URL configured"; exit 1; fi
+          echo "TARGET_URL=$TARGET" >> $GITHUB_ENV
+
+      - name: Install k6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg2 software-properties-common
+          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Run k6 smoke test
+        run: |
+          k6 run --out json=results-k6.json tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL"
+
+      - name: Upload k6 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: loginAPI-k6-report
+          path: results-k6.json
