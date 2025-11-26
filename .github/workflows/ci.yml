@@ -106,10 +106,20 @@ jobs:
           fi
 
   infra-tests:
-    name: Infra Tests - loginAPI (start-with-memory + Newman)
-      needs: build
+    name: Infra Tests - loginAPI (GitHub Actions mongo service + Newman)
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # provide a MongoDB service container for more stable CI than mongodb-memory-server
+    services:
+      mongo:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+    env:
+      MONGO_URI: mongodb://127.0.0.1:27017/ceos_ci
+      JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+      PORT: 8081
     steps:
       - uses: actions/checkout@v4
 
@@ -122,54 +132,16 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
 
-      - name: Install memory mongo and newman
-        run: |
-          npm install mongodb-memory-server@^8.11.0 newman --no-save
-
-      - name: Create start script (memory mongo + app)
-        run: |
-          cat > start-with-memory.js <<'JS'
-          const { MongoMemoryServer } = require('mongodb-memory-server');
-          const { spawn } = require('child_process');
-          const fs = require('fs');
-
-          (async ()=>{
-            try {
-              const mongod = await MongoMemoryServer.create();
-              const uri = mongod.getUri();
-              const jwt = process.env.JWT_SECRET || 'ci-secret';
-              const env = Object.assign({}, process.env, { MONGO_URI: uri, JWT_SECRET: jwt, PORT: '8081' });
-              const out = fs.createWriteStream('server.log', { flags: 'a' });
-              const child = spawn('node', ['index.js'], { env, stdio: ['ignore','pipe','pipe'] });
-              child.stdout.pipe(out);
-              child.stderr.pipe(out);
-              console.log('started child pid', child.pid);
-
-              process.on('SIGTERM', async ()=>{
-                try { child.kill(); } catch(e){}
-                try { await mongod.stop(); } catch(e){}
-                process.exit(0);
-              });
-
-              // keep alive
-              await new Promise(()=>{});
-            } catch (err) {
-              console.error('start-with-memory error', err);
-              process.exit(1);
-            }
-          })();
-          JS
-
-      - name: Start memory-backed app
+      - name: Start loginAPI (uses Actions mongo)
         run: |
           touch server.log || true
-          node start-with-memory.js > server.log 2>&1 &
+          node index.js > ./server.log 2>&1 &
           echo $! > server.pid
 
       - name: Wait for service (health)
         run: |
           set -e
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             if curl -sfS http://localhost:8081/ >/dev/null 2>&1; then
               echo "service is up"; exit 0
             fi
@@ -182,10 +154,11 @@ jobs:
           tail -n 200 ./server.log || true
           exit 1
 
-      - name: Run Newman collection (login) against memory-mongo instance
+      - name: Run Newman collection (login) against Actions mongo
         run: |
           echo "---- server.log (head) ----"
           head -n 200 ./server.log || true
+          npm install newman --no-save
           npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail || {
             echo "Newman failed; dumping server.log";
             echo "---- server.log (full) ----";
@@ -200,7 +173,7 @@ jobs:
           name: login-server-log
           path: server.log
 
-      - name: Stop memory-backed app
+      - name: Stop infra server
         if: always()
         run: |
           if [ -f server.pid ]; then
