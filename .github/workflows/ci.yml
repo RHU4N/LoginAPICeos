@@ -222,13 +222,16 @@ jobs:
 
       - name: Start memory-backed app
         run: |
-          node start-with-memory.js &
+          # ensure a server.log exists so tail/grep won't fail
+          touch server.log || true
+          # start the memory-backed app and redirect stdout/stderr to server.log
+          node start-with-memory.js > server.log 2>&1 &
           echo $! > server.pid
 
       - name: Wait for service (health)
         run: |
           set -e
-          for i in $(seq 1 60); do
+          for i in $(seq 1 30); do
             if curl -sfS http://localhost:8081/ >/dev/null 2>&1; then
               echo "service is up"; exit 0
             fi
