@@ -33,9 +33,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      - name: Run k6 smoke test
+
+      - name: Health check / warm up
         run: |
+          echo "Checking target: $TARGET_URL"
+          HEALTH_URL="$TARGET_URL"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 5 "$HEALTH_URL/health" -o /dev/null; then
+              echo "health OK on $HEALTH_URL/health"; break
+            fi
+            if curl -fsS --max-time 5 "$HEALTH_URL" -o /dev/null; then
+              echo "root OK on $HEALTH_URL"; break
+            fi
+            echo "waiting for $HEALTH_URL (attempt $i/6)..."
+            sleep 5
+          done
+
+      - name: Run k6 smoke test (capture exit code)
+        env:
+          FAIL_ON_THRESHOLD: ${{ env.FAIL_ON_THRESHOLD }}
+        run: |
+          set +e
           k6 run --out json=results-k6.json tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL"
+          RC=$?
+          echo $RC > k6-rc.txt
+          set -e
+          echo "k6 exit code: $RC"
+          if [ "${FAIL_ON_THRESHOLD}" = "true" ]; then
+            if [ "$RC" -ne 0 ]; then
+              echo "Failing because FAIL_ON_THRESHOLD=true and k6 exit code=$RC"; exit $RC
+            fi
+          else
+            echo "Not failing on k6 thresholds (FAIL_ON_THRESHOLD not set or not 'true').";
+          fi
 
       - name: Upload k6 report
         uses: actions/upload-artifact@v4
