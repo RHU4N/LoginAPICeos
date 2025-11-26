@@ -15,38 +15,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Ensure JWT_SECRET and MONGO_URI are available
+      - name: Ensure JWT_SECRET and MONGO_URI are available (secrets or vars)
         run: |
-          if [ -z "${{ secrets.JWT_SECRET }}" ] || [ -z "${{ secrets.MONGO_URI }}" ]; then
-            echo "::error::Required secrets JWT_SECRET or MONGO_URI are not set. Aborting tests."
-            repo="${{ github.repository }}"
-            pr_number="${{ github.event.pull_request.number }}"
-            title="[CI] Tests failed: missing secrets"
-            body="The CI test step could not run because required secrets are not set for workflow ${{ github.workflow }} on ref ${{ github.ref }}.\n\nActor: ${{ github.actor }}"
-            if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
-              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
-                -d "{\"body\": \"${body}\"}" \
-                "https://api.github.com/repos/${repo}/issues/${pr_number}/comments" || true
-              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
-                -d '["ci-failed"]' "https://api.github.com/repos/${repo}/issues/${pr_number}/labels" || true
-            else
-              curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
-                -d "{\"title\": \"${title}\", \"body\": \"${body}\", \"labels\": [\"ci-failed\"] }" \
-                "https://api.github.com/repos/${repo}/issues" || true
-            fi
+          if [ -z "${{ secrets.JWT_SECRET }}" ] && [ -z "${{ vars.JWT_SECRET }}" ]; then
+            echo "::error::Required secret/var JWT_SECRET is not set. Aborting tests."
             exit 1
           fi
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
-          echo "mongoUri=${{ secrets.MONGO_URI }}" >> $GITHUB_ENV
+          if [ -z "${{ secrets.MONGO_URI }}" ] && [ -z "${{ vars.MONGO_URI }}" ]; then
+            echo "::error::Required secret/var MONGO_URI is not set. Aborting tests."
+            exit 1
+          fi
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+          else
+            echo "JWT_SECRET=${{ vars.JWT_SECRET }}" >> $GITHUB_ENV
+          fi
+          if [ -n "${{ secrets.MONGO_URI }}" ]; then
+            echo "mongoUri=${{ secrets.MONGO_URI }}" >> $GITHUB_ENV
+          else
+            echo "mongoUri=${{ vars.MONGO_URI }}" >> $GITHUB_ENV
+          fi
       - name: Install
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Run tests
         run: npm test -- --runInBand
       - name: Run build (if any)
         run: npm run build --if-present
 
   trigger-render-deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/devops')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -107,51 +104,62 @@ jobs:
             exit 1
           fi
 
-    newman-login:
-      name: Newman - Login tests
-      needs: build
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
+  newman-login:
+    name: Newman - Login tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-        - name: Use Node.js
-          uses: actions/setup-node@v4
-          with:
-            node-version: '18'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-        - name: Install dependencies (loginAPI)
-          run: |
-            cd loginAPI
-            npm ci
+      - name: Install dependencies (loginAPI)
+        run: |
+          npm install --no-audit --no-fund
 
-        - name: Ensure required secrets present
-          run: |
-            if [ -z "${{ secrets.JWT_SECRET }}" ] || [ -z "${{ secrets.MONGO_URI }}" ]; then
-              echo "::error::Required secrets JWT_SECRET or MONGO_URI are not set. Aborting Newman tests."
-              exit 1
-            fi
+      - name: Ensure required secrets/vars present (double-check)
+        run: |
+          if [ -z "${{ secrets.JWT_SECRET }}" ] && [ -z "${{ vars.JWT_SECRET }}" ]; then
+            echo "::error::Required secret/var JWT_SECRET is not set. Aborting Newman tests."
+            exit 1
+          fi
+          if [ -z "${{ secrets.MONGO_URI }}" ] && [ -z "${{ vars.MONGO_URI }}" ]; then
+            echo "::error::Required secret/var MONGO_URI is not set. Aborting Newman tests."
+            exit 1
+          fi
 
-        - name: Start loginAPI server
-          working-directory: ./loginAPI
-          env:
-            mongoUri: ${{ secrets.MONGO_URI }}
-            JWT_SECRET: ${{ secrets.JWT_SECRET }}
-            PORT: 8081
-            NODE_ENV: development
-          run: |
-            node index.js &
-            n=0
-            until curl -sSf http://localhost:8081/ >/dev/null 2>&1 || [ $n -ge 30 ]; do
-              n=$((n+1))
-              echo "waiting for server... $n"
-              sleep 1
-            done
-            if [ $n -ge 30 ]; then
-              echo "Server did not start in time"
-              exit 1
-            fi
+      - name: Start loginAPI server
+        env:
+          mongoUri: ${{ secrets.MONGO_URI || vars.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+          PORT: 8081
+          NODE_ENV: development
+        run: |
+          # start server and capture logs
+          node index.js > ./server.log 2>&1 &
+          n=0
+          until curl -sSf http://localhost:8081/ >/dev/null 2>&1 || [ $n -ge 60 ]; do
+            n=$((n+1))
+            echo "waiting for server... $n"
+            sleep 1
+          done
+          if [ $n -ge 60 ]; then
+            echo "Server did not start in time"
+            echo "---- server.log ----"
+            tail -n 200 ./server.log || true
+            exit 1
+          fi
 
-        - name: Run Newman collection (login)
-          working-directory: ./loginAPI
-          run: |
-            npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail
+      - name: Run Newman collection (login)
+        run: |
+          echo "---- server.log (head) ----"
+          head -n 200 ./server.log || true
+          npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail || {
+            echo "Newman failed; dumping server.log";
+            echo "---- server.log (full) ----";
+            tail -n +1 ./server.log || true;
+            exit 1;
+          }
