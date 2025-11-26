@@ -43,7 +43,8 @@ jobs:
         run: npm run build --if-present
 
   trigger-render-deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/devops')
+    # temporarily disabled to avoid failing CI while secrets/vars are being fixed
+    if: false
     needs: build
     runs-on: ubuntu-latest
     steps:
