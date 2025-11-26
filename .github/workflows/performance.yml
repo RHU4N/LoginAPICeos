@@ -1,6 +1,8 @@
 name: Performance - loginAPI (k6 smoke)
 
 on:
+  push:
+    branches: [ devops, main, master ]
   workflow_dispatch:
   schedule:
     - cron: '0 */6 * * *'
