@@ -1,0 +1,74 @@
+name: Performance - loginAPI (k6 smoke)
+
+on:
+  push:
+    branches: [ devops, main, master ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        run: |
+          TARGET="${{ secrets.CEOS_LOGIN_API_URL }}"
+          if [ -z "$TARGET" ]; then TARGET="${{ vars.CEOS_LOGIN_API_URL }}"; fi
+          if [ -z "$TARGET" ]; then TARGET="${{ secrets.LOGIN_URL }}"; fi
+          if [ -z "$TARGET" ]; then TARGET="${{ vars.LOGIN_URL }}"; fi
+          if [ -z "$TARGET" ]; then echo "ERROR: No LOGIN_URL configured"; exit 1; fi
+          echo "TARGET_URL=$TARGET" >> $GITHUB_ENV
+
+      - name: Install k6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg2 software-properties-common
+          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+
+      - name: Health check / warm up
+        run: |
+          echo "Checking target: $TARGET_URL"
+          HEALTH_URL="$TARGET_URL"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 5 "$HEALTH_URL/health" -o /dev/null; then
+              echo "health OK on $HEALTH_URL/health"; break
+            fi
+            if curl -fsS --max-time 5 "$HEALTH_URL" -o /dev/null; then
+              echo "root OK on $HEALTH_URL"; break
+            fi
+            echo "waiting for $HEALTH_URL (attempt $i/6)..."
+            sleep 5
+          done
+
+      - name: Run k6 smoke test (capture exit code)
+        env:
+          FAIL_ON_THRESHOLD: ${{ env.FAIL_ON_THRESHOLD }}
+        run: |
+          set +e
+          k6 run --out json=results-k6.json tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL"
+          RC=$?
+          echo $RC > k6-rc.txt
+          set -e
+          echo "k6 exit code: $RC"
+          if [ "${FAIL_ON_THRESHOLD}" = "true" ]; then
+            if [ "$RC" -ne 0 ]; then
+              echo "Failing because FAIL_ON_THRESHOLD=true and k6 exit code=$RC"; exit $RC
+            fi
+          else
+            echo "Not failing on k6 thresholds (FAIL_ON_THRESHOLD not set or not 'true').";
+          fi
+
+      - name: Upload k6 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: loginAPI-k6-report
+          path: results-k6.json
