@@ -83,3 +83,16 @@ POST /user/login
 ## Observações
 - Use o token JWT retornado no login para acessar rotas protegidas (exemplo: histórico).
 - Projeto estruturado para fácil manutenção, testes e escalabilidade.
+
+## Testes e CI
+
+- Unit tests: Jest (`__tests__`). Execute com `npm test`.
+- Integração: Postman collection em `postman/login.postman_collection.json` — o CI usa Newman para rodar estas coleções contra um serviço de testes (Actions service: Mongo).
+- Performance: `tests/perf/k6_test.js` disponível para smoke/perf tests.
+- Segurança: `snyk` + `npm audit` workflows (Snyk requer `SNYK_TOKEN`).
+
+## Deploy / Health
+
+- Deploy: `render.yaml` presente — projetado para deploys no Render. Render realiza health checks periódicos (configuráveis via dashboard ou `render.yaml`).
+
+**Last updated:** 2025-11-27
