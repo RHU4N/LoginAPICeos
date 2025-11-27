@@ -95,4 +95,3 @@ POST /user/login
 
 - Deploy: `render.yaml` presente — projetado para deploys no Render. Render realiza health checks periódicos (configuráveis via dashboard ou `render.yaml`).
 
-**Last updated:** 2025-11-27
