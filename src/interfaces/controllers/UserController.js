@@ -65,9 +65,11 @@ class UserController {
 
   async getHistorico(req, res) {
     try {
+      console.log('[UserController] getHistorico called for userId:', req.userId);
       const historico = await this.userUseCases.getHistorico(req.userId);
       res.status(200).json(historico);
     } catch (err) {
+      console.error('[UserController] getHistorico error:', err && err.stack ? err.stack : err);
       this.handleError(err, res);
     }
   }

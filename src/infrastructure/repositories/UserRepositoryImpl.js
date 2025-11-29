@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../../domain/entities/User');
 const UserRepository = require('../../domain/repositories/UserRepository');
 
@@ -22,6 +23,7 @@ class UserRepositoryImpl extends UserRepository {
         return await User.findByIdAndDelete(id);
     }
     async addHistorico(userId, historico) {
+        if (!mongoose.Types.ObjectId.isValid(userId)) return null;
         const user = await User.findById(userId);
         if (!user) return null;
         user.historico.push(historico);
@@ -29,27 +31,31 @@ class UserRepositoryImpl extends UserRepository {
         return user;
     }
     async getHistorico(userId) {
+        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
         const user = await User.findById(userId).select('historico');
-        return user ? user.historico : null;
+        return user ? user.historico : [];
     }
     async clearHistorico(userId) {
         // Remove all historico entries for the user
+        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
         const updated = await User.findByIdAndUpdate(
             userId,
             { $set: { historico: [] } },
             { new: true }
         ).select('historico');
-        return updated ? updated.historico : null;
+        return updated ? updated.historico : [];
     }
 
     async deleteHistoricoItem(userId, historicoId) {
         // Pull the subdocument with the provided _id from historico
+        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
+        // historicoId is a subdocument id; guard against invalid ids but still attempt the pull
         const updated = await User.findByIdAndUpdate(
             userId,
             { $pull: { historico: { _id: historicoId } } },
             { new: true }
         ).select('historico');
-        return updated ? updated.historico : null;
+        return updated ? updated.historico : [];
     }
 }
 

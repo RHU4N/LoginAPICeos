@@ -168,6 +168,11 @@ router.get('/', (req, res) => userController.getAll(req, res));
  *                   example: Erro interno do servidor
  */
 router.post('/', (req, res) => userController.create(req, res));
+// Bind /historico routes before the dynamic :id route so 'historico' is not treated as an id
+router.post('/historico', auth, (req, res) => userController.addHistorico(req, res));
+router.get('/historico', auth, (req, res) => userController.getHistorico(req, res));
+router.delete('/historico', auth, (req, res) => userController.clearHistorico(req, res));
+router.delete('/historico/:id', auth, (req, res) => userController.deleteHistoricoItem(req, res));
 /**
  * @openapi
  * /users/{id}:

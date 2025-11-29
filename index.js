@@ -6,10 +6,14 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 8081;
 
-// Fail fast if required env is missing
+// Ensure JWT_SECRET is set. In local/dev, fall back to a development secret
 if (!process.env.JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET não está definido. Verifique o arquivo .env ou as variáveis de ambiente.');
-  process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: JWT_SECRET não está definido. Verifique o arquivo .env ou as variáveis de ambiente.');
+    process.exit(1);
+  }
+  console.warn('Aviso: JWT_SECRET não definido — usando segredo de desenvolvimento temporário.');
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_local';
 }
 
 // Inicializa conexão com o banco (skip when running tests)
@@ -20,6 +24,12 @@ if (process.env.NODE_ENV !== 'test') {
 // Middlewares globais
 app.use(bodyParser.json());
 app.use(cors());
+
+// Simple request logger for local debugging
+app.use((req, res, next) => {
+  console.log('[Request] ', req.method, req.path, 'headers:', { authorization: req.headers.authorization });
+  next();
+});
 
 // Rotas de teste
 app.get('/', (req, res) => res.send('Estou aqui'));
