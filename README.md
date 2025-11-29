@@ -1,53 +1,66 @@
-# LoginAPI Clean Architecture
+# Login API (loginAPI)
 
-API de autenticação e gerenciamento de usuários seguindo o padrão Clean Architecture.
+Breve descrição
+----------------
+API de autenticação e gerenciamento de usuários para o ecossistema CEOS. Fornece endpoints para login, registro, verificação de token e recuperação de senha.
 
-## Desenvolvedores
-- Rhuan
-- Mauricio
+Principais funcionalidades
+-------------------------
+- Autenticação via JWT.
+- Criptografia de senhas (Bcrypt).
+- Endpoints para login, registro, verificação de token e gerenciamento de usuários.
+- Middleware de autenticação (`infrastructure/middleware/AuthMiddleware.js`).
+
+Colaboradores
+-------------
 - Leonardo
+- Mauricio
+- Rhuan
 - Vitor
 
-## Estrutura do Projeto
 
+
+Tecnologias utilizadas
+----------------------
+- Node.js
+- Express
+- MongoDB (local ou Atlas)
+- Mongoose
+- Bcrypt
+- JWT
+- Testes: Jest
+- Docker (opcional)
+
+Estrutura relevante
+-------------------
+- `src/infrastructure/providers/` — provedores como `BcryptPasswordHasher` e `JwtTokenProvider`.
+- `src/interfaces/controllers/` — controllers HTTP.
+- `src/infrastructure/repositories/` — implementação do repositório de usuários.
+- `db.js` — inicialização do banco.
+
+Executando localmente
+---------------------
+1. Instale dependências e configure `.env` com variáveis (ex.: `JWT_SECRET`, `MONGO_URI`):
+
+```cmd
+cd loginAPI
+npm install
 ```
-src/
-  domain/
-    entities/
-    repositories/
-  application/
-    errors/
-    use_cases/
-  infrastructure/
-    db/
-    middleware/
-    providers/
-    repositories/
-  interfaces/
-    controllers/
-    routes/
-index.js
-package.json
+
+2. Inicie a API:
+
+```cmd
+npm start
 ```
 
-## Como rodar
+3. Executar testes:
 
-1. Instale as dependências:
-   ```bash
-   npm install
-   ```
-2. Configure a string de conexão do MongoDB em `src/infrastructure/db/db.js` se necessário.
-3. Inicie o servidor:
-   ```bash
-   npx nodemon index.js
-   ```
-   ou
-   ```bash
-   node index.js
-   ```
+```cmd
+npm test
+```
 
-## Endpoints principais
-
+Endpoints principais
+-------------------
 - `POST /user` — Cadastro de usuário
 - `POST /user/login` — Login
 - `GET /user` — Listar usuários
@@ -57,9 +70,8 @@ package.json
 - `POST /user/historico` — Adicionar histórico (autenticado)
 - `GET /user/historico` — Listar histórico (autenticado)
 
-## Exemplo de requisição
-
-Cadastro:
+Exemplo de requisição (Cadastro)
+------------------------------
 ```json
 POST /user
 {
@@ -71,27 +83,15 @@ POST /user
 }
 ```
 
-Login:
-```json
-POST /user/login
-{
-  "email": "joao@email.com",
-  "senha": "123456"
-}
-```
+Observações
+-----------
+- Use o token JWT retornado no login para acessar rotas protegidas.
+- Atualize `Colaboradores` se necessário e preencha `URL pública` somente se houver deploy.
 
-## Observações
-- Use o token JWT retornado no login para acessar rotas protegidas (exemplo: histórico).
-- Projeto estruturado para fácil manutenção, testes e escalabilidade.
+Testes e CI
+----------
+- Unit tests: Jest (`__tests__`) — execute com `npm test`.
+- Postman collection: `postman/login.postman_collection.json`.
+- Deploy: `render.yaml` e Dockerfile incluídos para facilitar deploy/containerização.
 
-## Testes e CI
-
-- Unit tests: Jest (`__tests__`). Execute com `npm test`.
-- Integração: Postman collection em `postman/login.postman_collection.json` — o CI usa Newman para rodar estas coleções contra um serviço de testes (Actions service: Mongo).
-- Performance: `tests/perf/k6_test.js` disponível para smoke/perf tests.
-- Segurança: `snyk` + `npm audit` workflows (Snyk requer `SNYK_TOKEN`).
-
-## Deploy / Health
-
-- Deploy: `render.yaml` presente — projetado para deploys no Render. Render realiza health checks periódicos (configuráveis via dashboard ou `render.yaml`).
 
