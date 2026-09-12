@@ -1,4 +1,5 @@
 // Controller de Autenticação (Login)
+const successResponse = require('../responses/successResponse');
 /**
  * @openapi
  * tags:
@@ -14,7 +15,7 @@ class AuthController {
         try {
             const { email, senha } = req.body;
             const token = await this.loginUseCase.execute(email, senha);
-            return res.json({ token });
+            return successResponse(res, { token }, 'Login realizado com sucesso');
         } catch (error) {
             return res.status(error.statusCode || 500).json({ error: error.message });
         }

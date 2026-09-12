@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 8081;
+const successResponse = require('./src/interfaces/responses/successResponse');
 
 // Ensure JWT_SECRET is set. In local/dev, fall back to a development secret
 if (!process.env.JWT_SECRET) {
@@ -32,7 +33,7 @@ app.use((req, res, next) => {
 });
 
 // Rotas de teste
-app.get('/', (req, res) => res.send('Estou aqui'));
+app.get('/', (req, res) => successResponse(res, null, 'API disponível'));
 
 // Importa rotas (interface_adapters/routes)
 const userRoutes = require('./src/interfaces/routes/UserRoutes');

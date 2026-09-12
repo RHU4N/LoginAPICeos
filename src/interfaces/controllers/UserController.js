@@ -1,4 +1,5 @@
 const { UserErrors } = require('../../application/errors/UserErrors');
+const successResponse = require('../responses/successResponse');
 
 class UserController {
   constructor(userUseCases) {
@@ -8,7 +9,7 @@ class UserController {
   async getAll(req, res) {
     try {
       const users = await this.userUseCases.getAllUsers();
-      res.status(200).json(users);
+      successResponse(res, users, 'Usuários consultados com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
@@ -17,7 +18,7 @@ class UserController {
   async getById(req, res) {
     try {
       const user = await this.userUseCases.getUserById(req.params.id);
-      res.status(200).json(user);
+      successResponse(res, user, 'Usuário consultado com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
@@ -26,7 +27,7 @@ class UserController {
   async create(req, res) {
     try {
       await this.userUseCases.registerUser(req.body);
-      res.status(201).json({ message: "Cadastrado com sucesso" });
+      successResponse(res, null, 'Usuário cadastrado com sucesso', 201);
     } catch (err) {
       this.handleError(err, res);
     }
@@ -35,7 +36,7 @@ class UserController {
   async update(req, res) {
     try {
       await this.userUseCases.updateUser(req.params.id, req.body);
-      res.status(200).json({ message: "Atualizado com sucesso" });
+      successResponse(res, null, 'Usuário atualizado com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
@@ -44,7 +45,7 @@ class UserController {
   async delete(req, res) {
     try {
       await this.userUseCases.deleteUser(req.params.id);
-      res.status(200).json({ message: "Excluído com sucesso" });
+      successResponse(res, null, 'Usuário excluído com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
@@ -57,7 +58,7 @@ class UserController {
         return res.status(400).json({ error: "Campos obrigatórios faltando" });
 
       await this.userUseCases.addHistorico(req.userId, { tipo, valores, resultado });
-      res.status(201).json({ message: "Histórico salvo com sucesso" });
+      successResponse(res, null, 'Histórico salvo com sucesso', 201);
     } catch (err) {
       this.handleError(err, res);
     }
@@ -67,7 +68,7 @@ class UserController {
     try {
       console.log('[UserController] getHistorico called for userId:', req.userId);
       const historico = await this.userUseCases.getHistorico(req.userId);
-      res.status(200).json(historico);
+      successResponse(res, historico, 'Histórico consultado com sucesso');
     } catch (err) {
       console.error('[UserController] getHistorico error:', err && err.stack ? err.stack : err);
       this.handleError(err, res);
@@ -77,7 +78,7 @@ class UserController {
   async clearHistorico(req, res) {
     try {
       const historico = await this.userUseCases.clearHistorico(req.userId);
-      return res.status(200).json({ message: 'Histórico removido com sucesso', historico });
+      return successResponse(res, historico, 'Histórico removido com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
@@ -88,7 +89,7 @@ class UserController {
       const { id } = req.params;
       if (!id) return res.status(400).json({ error: 'ID do histórico é obrigatório' });
       const historico = await this.userUseCases.deleteHistoricoItem(req.userId, id);
-      return res.status(200).json({ message: 'Item do histórico removido com sucesso', historico });
+      return successResponse(res, historico, 'Item do histórico removido com sucesso');
     } catch (err) {
       this.handleError(err, res);
     }
