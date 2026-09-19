@@ -67,7 +67,8 @@ const environment = {
   // Cookies (segurança)
   COOKIE_SECURE: process.env.NODE_ENV === "production",
   COOKIE_HTTP_ONLY: true,
-  COOKIE_SAME_SITE: "Strict",
+  // Vercel e Render usam domínios distintos em produção.
+  COOKIE_SAME_SITE: process.env.NODE_ENV === "production" ? "none" : "strict",
 
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:3000",

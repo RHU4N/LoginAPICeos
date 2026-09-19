@@ -41,11 +41,11 @@ async function connectDatabase() {
     });
 
     console.log(`✅ Conectado ao MongoDB com sucesso!`);
-    console.log(`   Database selecionado: ${mongoose.connection.db.getName()}`);
+    const currentDb = mongoose.connection.db.databaseName;
+    console.log(`   Database selecionado: ${currentDb}`);
 
     // Validar que produção nunca usa banco de testes
     if (environment.isProduction()) {
-      const currentDb = mongoose.connection.db.getName();
       if (currentDb.includes("test")) {
         console.error(
           "❌ SEGURANÇA: Produção conectou ao banco de testes! Abortando...",
