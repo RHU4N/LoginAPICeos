@@ -94,6 +94,9 @@ const iotRoutes = require("./src/interfaces/routes/IoTRoutes");
 const historicoRoutes = require("./src/interfaces/routes/HistoricoRoutes");
 
 app.use("/auth", authRoutes);
+// Compatibilidade temporária para clientes antigos; a rota canônica é
+// /historicos, cuja ownership é sempre determinada pelo JWT.
+app.use("/users/historico", historicoRoutes);
 app.use("/users", userRoutes);
 app.use("/favorites", favoriteRoutes);
 app.use("/custom-functions", customFunctionRoutes);
