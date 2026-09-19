@@ -13,10 +13,11 @@ const swaggerDefinition = {
   ,
   components: {
     securitySchemes: {
-      bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT'
+      cookieAuth: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'accessToken',
+        description: 'Cookie HttpOnly criado por POST /auth/login.'
       }
     },
     responses: {
@@ -77,7 +78,7 @@ const swaggerDefinition = {
       }
     }
   },
-  security: [ { bearerAuth: [] } ]
+  security: [ { cookieAuth: [] } ]
 };
 
 const options = {

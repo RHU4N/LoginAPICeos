@@ -244,13 +244,15 @@ Medições de sensores IoT com índices otimizados para time-series
 {
   "success": true,
   "data": {
-    "accessToken": "eyJhbGc...",
-    "refreshToken": "eyJhbGc...",
     "expiresIn": "15m",
     "user": { "id": "...", "nome": "...", "email": "..." }
   }
 }
 ```
+
+Os tokens JWT são enviados exclusivamente em cookies `HttpOnly` (`accessToken`
+e `refreshToken`); eles não aparecem no corpo da resposta nem são guardados
+no `localStorage`.
 
 **`POST /auth/refresh`** - Renovar Token
 
@@ -289,6 +291,35 @@ Dados do usuário logado
 **`GET /historicos`** (🔒) - Listar com paginação
 **`DELETE /historicos/:id`** (🔒) - Remover item
 **`DELETE /historicos?confirmed=true`** (🔒) - Limpar tudo
+
+### Favoritos
+
+**`POST /favorites`** (🔒) - Criar favorito
+
+**`GET /favorites`** (🔒) - Listar favoritos do usuário
+**`DELETE /favorites/:id`** (🔒) - Remover favorito próprio
+
+### Funções personalizadas
+
+**`POST /custom-functions`** (🔒) - Criar função
+
+**`GET /custom-functions`** (🔒) - Listar funções do usuário
+
+**`GET /custom-functions/:id`** (🔒) - Consultar função própria
+
+**`PATCH /custom-functions/:id`** (🔒) - Atualizar função própria
+**`DELETE /custom-functions/:id`** (🔒) - Remover função própria
+
+### IoT
+
+**`POST /iot/measurements`** (🔒) - Registrar medição
+
+**`GET /iot/measurements`** (🔒) - Listar medições próprias com paginação/filtros
+
+**`GET /iot/measurements/:id`** (🔒) - Consultar medição própria
+
+**`GET /iot/devices/:deviceId/measurements`** (🔒) - Filtrar por dispositivo
+**`GET /iot/sensors/:sensorId/measurements`** (🔒) - Filtrar por sensor
 
 ---
 
@@ -379,17 +410,19 @@ Testes implementados para:
 - ✅ Proteção brute force
 - ✅ Tratamento de erros
 - ✅ DTOs
-- ⏳ Favoritos
-- ⏳ Funções personalizadas
-- ⏳ IoT
+- ✅ Favoritos
+- ✅ Funções personalizadas
+- ✅ IoT
 
 ---
 
 ## 📚 Documentação API
 
-Acesso em: `http://localhost:8081/api-docs`
+Acesso local em: `http://localhost:8081/docs`.
 
-Swagger/OpenAPI com todos os endpoints, schemas e exemplos.
+Swagger/OpenAPI documenta os endpoints, campos de entrada e autenticação por
+cookie. Ele é habilitado em desenvolvimento e desabilitado em produção por
+padrão; use `ENABLE_SWAGGER=true` somente em ambiente controlado.
 
 ---
 
@@ -419,6 +452,7 @@ Swagger/OpenAPI com todos os endpoints, schemas e exemplos.
 | `BCRYPT_ROUNDS`           | `10`                    | Custo Bcrypt                    |
 | `RATE_LIMIT_MAX_ATTEMPTS` | `5`                     | Tentativas login antes bloqueio |
 | `CORS_ORIGIN`             | `http://localhost:3000` | CORS permitido                  |
+| `ENABLE_SWAGGER`          | `true`                  | Exibe `/docs` em ambiente controlado |
 
 ---
 
@@ -437,9 +471,9 @@ docker-compose up -d
 - [x] DTOs e validação
 - [x] Tratamento de erros padronizado
 - [x] Histórico em collection separada
-- [ ] Favoritos (endpoints)
-- [ ] Funções Personalizadas (endpoints)
-- [ ] IoT Measurements (endpoints)
+- [x] Favoritos (endpoints)
+- [x] Funções Personalizadas (endpoints)
+- [x] IoT Measurements (endpoints)
 - [ ] Rate limiting com Redis
 - [ ] Integração com Data Streaming
 
@@ -472,7 +506,7 @@ ISC
 
 ## 📞 Suporte
 
-Documentação completa em: [/docs/API.md](/docs/API.md)  
+Documentação completa em: [docs/DATABASE.md](docs/DATABASE.md)
 Issues: https://github.com/RHU4N/LoginAPICeos/issues
 
 ### Estrutura de dados ST12
