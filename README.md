@@ -1,97 +1,483 @@
-# Login API (loginAPI)
+# LoginAPICeos - API de Autenticação Refatorada v2.0
 
-Breve descrição
-----------------
-API de autenticação e gerenciamento de usuários para o ecossistema CEOS. Fornece endpoints para login, registro, verificação de token e recuperação de senha.
+**Status:** ✅ Arquitetura Refatorada | Testes Implementados | Pronto para Produção
 
-Principais funcionalidades
--------------------------
-- Autenticação via JWT.
-- Criptografia de senhas (Bcrypt).
-- Endpoints para login, registro, verificação de token e gerenciamento de usuários.
-- Middleware de autenticação (`infrastructure/middleware/AuthMiddleware.js`).
+> API segura, escalável e preparada para a evolução do projeto CEOS com suporte a Favoritos, Funções Personalizadas e IoT
 
-Colaboradores
--------------
-- Leonardo
-- Mauricio
-- Rhuan
-- Vitor
+---
 
+## 🎯 Resumo Executivo
 
+Esta é a versão **completamente refatorada** da API de autenticação do CEOS. Implementa:
 
-Tecnologias utilizadas
-----------------------
-- Node.js
-- Express
-- MongoDB (local ou Atlas)
-- Mongoose
-- Bcrypt
-- JWT
-- Testes: Jest
-- Docker (opcional)
+✅ Autenticação segura com JWT (access + refresh tokens)
+✅ Proteção contra brute force
+✅ Arquitetura em camadas com separação clara de responsabilidades
+✅ DTOs para validação de entrada/saída
+✅ Tratamento de erros padronizado
+✅ Configuração centralizada e segura por ambiente
+✅ Suporte a múltiplos ambientes (DEV/TEST/PROD)
+✅ Preparada para Favoritos, Funções Personalizadas e IoT
+✅ Estrutura pronta para Data Streaming
 
-Estrutura relevante
--------------------
-- `src/infrastructure/providers/` — provedores como `BcryptPasswordHasher` e `JwtTokenProvider`.
-- `src/interfaces/controllers/` — controllers HTTP.
-- `src/infrastructure/repositories/` — implementação do repositório de usuários.
-- `db.js` — inicialização do banco.
+---
 
-Executando localmente
----------------------
-1. Instale dependências e configure `.env` com variáveis (ex.: `JWT_SECRET`, `MONGO_URI`):
+## 🏗️ Arquitetura
 
-```cmd
-cd loginAPI
-npm install
+### Fluxo de Requisição
+
+```
+1. HTTP Request
+    ↓
+2. Middleware (Autenticação, BruteForce, Validação)
+    ↓
+3. Controller (Receber e validar com DTOs)
+    ↓
+4. Use Case (Lógica de negócio)
+    ↓
+5. Repository (Acesso ao MongoDB)
+    ↓
+6. HTTP Response (Padronizado)
 ```
 
-2. Inicie a API:
+### Estrutura de Diretórios
 
-```cmd
-npm start
+```
+LoginAPICeos/
+├── src/
+│   ├── config/                    # Configuração centralizada
+│   │   ├── environment.js         # Variáveis e validação
+│   │   ├── database.js            # Conexão MongoDB
+│   │   └── auth.js                # Segurança JWT/Senha
+│   │
+│   ├── domain/
+│   │   ├── entities/              # Modelos MongoDB
+│   │   │   ├── User.js
+│   │   │   ├── Historico.js
+│   │   │   ├── Favorite.js
+│   │   │   ├── CustomFunction.js
+│   │   │   └── IoTMeasurement.js
+│   │   └── repositories/          # Interfaces
+│   │
+│   ├── application/
+│   │   ├── use_cases/             # Lógica de negócio
+│   │   │   ├── LoginUseCase.js
+│   │   │   ├── RefreshTokenUseCase.js
+│   │   │   ├── ChangePasswordUseCase.js
+│   │   │   └── UserUseCases.js
+│   │   └── errors/                # (DEPRECATED)
+│   │
+│   ├── infrastructure/
+│   │   ├── db/                    # Inicialização BD
+│   │   ├── middleware/            # Middlewares Express
+│   │   │   ├── AuthMiddleware.js
+│   │   │   ├── BruteForceMiddleware.js
+│   │   │   └── ErrorHandler.js
+│   │   ├── providers/             # Serviços
+│   │   │   ├── JwtTokenProvider.js
+│   │   │   └── BcryptPasswordHasher.js
+│   │   └── repositories/          # Implementação
+│   │
+│   ├── interfaces/
+│   │   ├── controllers/           # Handlers HTTP
+│   │   ├── routes/                # Definição de rotas
+│   │   └── ...
+│   │
+│   ├── dto/                       # Data Transfer Objects
+│   │   ├── auth.dto.js
+│   │   ├── favorite.dto.js
+│   │   ├── custom-function.dto.js
+│   │   └── iot.dto.js
+│   │
+│   └── errors/                    # Erros padronizados
+│       └── AppError.js
+│
+├── __tests__/                     # Suite de testes
+├── swagger/                       # Documentação API
+├── .env.example                   # Template de variáveis
+├── index.js                       # Ponto de entrada
+├── package.json
+└── README.md
 ```
 
-3. Executar testes:
+---
 
-```cmd
-npm test
+## 🔐 Segurança
+
+### 1️⃣ Autenticação
+
+- **JWT Access Token:** 15 minutos (curta duração)
+- **JWT Refresh Token:** 7 dias (longa duração)
+- **Algoritmo:** HS256
+- **Validações:** Issuer, expiração, signature
+
+```bash
+Header: Authorization: Bearer <access_token>
 ```
 
-Endpoints principais
--------------------
-- `POST /user` — Cadastro de usuário
-- `POST /user/login` — Login
-- `GET /user` — Listar usuários
-- `GET /user/:id` — Buscar usuário por ID
-- `PUT /user/:id` — Atualizar usuário
-- `DELETE /user/:id` — Remover usuário
-- `POST /user/historico` — Adicionar histórico (autenticado)
-- `GET /user/historico` — Listar histórico (autenticado)
+### 2️⃣ Senhas
 
-Exemplo de requisição (Cadastro)
-------------------------------
-```json
-POST /user
+- **Hashing:** Bcrypt com 10 rounds
+- **Nunca em texto plano**
+- **Política de força:**
+  - Mínimo 8 caracteres
+  - Pelo menos 1 maiúscula
+  - Pelo menos 1 número
+  - Pelo menos 1 caractere especial (!@#$%^&\*)
+
+### 3️⃣ Proteção Brute Force
+
+- **Limite:** 5 tentativas
+- **Janela:** 15 minutos
+- **Bloqueio:** 30 minutos
+
+```
+Tentativa 1-5:   ✅ Permitido
+Tentativa 6:     🚫 Bloqueado por 30 min
+Após 30 min:     ✅ Desbloqueado
+```
+
+### 4️⃣ DTOs e Validação
+
+Toda entrada é validada com DTOs:
+
+```javascript
+const loginDTO = new LoginDTO(email, senha);
+loginDTO.validate(); // Lança erro se inválido
+```
+
+### 5️⃣ Separação de Ambientes
+
+```bash
+NODE_ENV=development  → Database: ceos_dev
+NODE_ENV=production   → Database: ceos
+```
+
+Produção **NUNCA** pode conectar a banco de testes.
+
+---
+
+## 📊 Banco de Dados
+
+### Collections
+
+#### `users`
+
+```javascript
 {
-  "nome": "João",
-  "email": "joao@email.com",
-  "senha": "123456",
-  "telefone": "11999999999",
-  "assinante": true
+  _id: ObjectId,
+  nome: String,
+  email: String (unique, index),
+  senhaHash: String (nunca retorna),
+  telefone: String,
+  assinante: Boolean,
+  ativo: Boolean,
+
+  // Segurança
+  tentativasLogin: Number,
+  bloqueadoAte: Date,
+  ultimoLogin: Date,
+  tokenRefreshRevoked: Array,
+
+  // Contadores
+  countFavoritos: Number,
+  countFuncoesPersonalizadas: Number,
+
+  criadoEm: Date,
+  atualizadoEm: Date
 }
 ```
 
-Observações
------------
-- Use o token JWT retornado no login para acessar rotas protegidas.
-- Atualize `Colaboradores` se necessário e preencha `URL pública` somente se houver deploy.
+#### `historicos` (NEW - antes era subdocumento)
 
-Testes e CI
-----------
-- Unit tests: Jest (`__tests__`) — execute com `npm test`.
-- Postman collection: `postman/login.postman_collection.json`.
-- Deploy: `render.yaml` e Dockerfile incluídos para facilitar deploy/containerização.
+```javascript
+{
+  _id: ObjectId,
+  userId: ObjectId (ref User),
+  tipo: String,
+  valores: String,
+  resultado: Mixed,
+  criadoEm: Date (index, auto-delete após 90 dias)
+}
+```
 
+#### `favorites` (NEW)
 
+```javascript
+{
+  _id: ObjectId,
+  userId: ObjectId,
+  resourceId: ObjectId,
+  resourceType: String (enum),
+  nome: String,
+  descricao: String,
+  criadoEm: Date
+}
+```
+
+#### `custom-functions` (NEW)
+
+Funções personalizadas criadas pelos usuários
+
+#### `iot-measurements` (NEW)
+
+Medições de sensores IoT com índices otimizados para time-series
+
+---
+
+## 📡 API Endpoints
+
+###登 Autenticação
+
+**`POST /auth/login`** - Login
+
+```json
+{
+  "email": "usuario@email.com",
+  "senha": "Senha123!"
+}
+```
+
+**Resposta:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGc...",
+    "refreshToken": "eyJhbGc...",
+    "expiresIn": "15m",
+    "user": { "id": "...", "nome": "...", "email": "..." }
+  }
+}
+```
+
+**`POST /auth/refresh`** - Renovar Token
+
+```json
+{
+  "refreshToken": "eyJhbGc..."
+}
+```
+
+**`POST /auth/change-password`** (🔒 Autenticado)
+
+```json
+{
+  "senhaAtual": "Senha123!",
+  "novaSenha": "NovaSenha456!",
+  "confirmaNovaSenha": "NovaSenha456!"
+}
+```
+
+**`POST /auth/logout`** (🔒 Autenticado)
+Revogar tokens
+
+**`GET /auth/me`** (🔒 Autenticado)
+Dados do usuário logado
+
+### Usuários
+
+**`POST /users`** - Registrar
+**`GET /users/:id`** (🔒) - Obter
+**`PATCH /users/:id`** (🔒) - Atualizar
+**`DELETE /users/:id`** (🔒) - Deletar
+
+### Histórico
+
+**`POST /historicos`** (🔒) - Adicionar
+**`GET /historicos`** (🔒) - Listar com paginação
+**`DELETE /historicos/:id`** (🔒) - Remover item
+**`DELETE /historicos?confirmed=true`** (🔒) - Limpar tudo
+
+---
+
+## 🚀 Como Usar
+
+### Instalação
+
+```bash
+git clone https://github.com/RHU4N/LoginAPICeos
+cd LoginAPICeos
+npm install
+```
+
+### Configurar Ambiente
+
+```bash
+cp .env.example .env
+```
+
+Editar `.env`:
+
+```env
+NODE_ENV=development
+MONGO_URI=mongodb+srv://user:pass@cluster/ceos?retryWrites=true&w=majority
+MONGODB_DATABASE=ceos_dev
+JWT_SECRET=seu-segredo-super-seguro-aqui-minimo-32-caracteres
+PORT=8081
+```
+
+### Executar
+
+```bash
+# Desenvolvimento (com hot reload)
+npm run dev
+
+# Produção
+npm start
+
+# Testes
+npm test
+
+# Testes com cobertura
+npm test -- --coverage
+```
+
+### Verificar Saúde da API
+
+```bash
+curl http://localhost:8081/health
+```
+
+Resposta:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "OK",
+    "environment": "development",
+    "database": "connected"
+  }
+}
+```
+
+---
+
+## 🧪 Testes
+
+```bash
+# Executar todos
+npm test
+
+# Teste específico
+npm test -- LoginUseCase.new.test.js
+
+# Watch mode
+npm test -- --watch
+```
+
+### Cobertura
+
+Testes implementados para:
+
+- ✅ Login/Logout
+- ✅ Criação de usuários
+- ✅ Validação de senhas
+- ✅ JWT (geração e validação)
+- ✅ Proteção brute force
+- ✅ Tratamento de erros
+- ✅ DTOs
+- ⏳ Favoritos
+- ⏳ Funções personalizadas
+- ⏳ IoT
+
+---
+
+## 📚 Documentação API
+
+Acesso em: `http://localhost:8081/api-docs`
+
+Swagger/OpenAPI com todos os endpoints, schemas e exemplos.
+
+---
+
+## 🔧 Troubleshooting
+
+| Erro                                   | Causa                                  | Solução                           |
+| -------------------------------------- | -------------------------------------- | --------------------------------- |
+| `MONGO_URI não definido`               | Variável de ambiente faltando          | Adicionar ao `.env`               |
+| `JWT_SECRET não é seguro`              | Segredo muito curto                    | Usar 32+ caracteres               |
+| `Produção conectou ao banco de testes` | NODE_ENV/MONGODB_DATABASE desalinhados | Verificar `.env`                  |
+| `Muitas tentativas bloqueadas`         | Brute force ativado                    | Aguardar 30 min ou limpar memória |
+| `CORS error`                           | Origin não permitida                   | Verificar `CORS_ORIGIN` em `.env` |
+
+---
+
+## ⚙️ Variáveis de Ambiente
+
+| Variável                  | Exemplo                 | Descrição                       |
+| ------------------------- | ----------------------- | ------------------------------- |
+| `NODE_ENV`                | `development`           | Ambiente (dev/test/prod)        |
+| `PORT`                    | `8081`                  | Porta HTTP                      |
+| `MONGO_URI`               | `mongodb+srv://...`     | String de conexão MongoDB       |
+| `MONGODB_DATABASE`        | `ceos_dev`              | Nome do banco                   |
+| `JWT_SECRET`              | `seu-segredo...`        | Chave de assinatura JWT         |
+| `JWT_EXPIRY_ACCESS`       | `15m`                   | Expiração access token          |
+| `JWT_EXPIRY_REFRESH`      | `7d`                    | Expiração refresh token         |
+| `BCRYPT_ROUNDS`           | `10`                    | Custo Bcrypt                    |
+| `RATE_LIMIT_MAX_ATTEMPTS` | `5`                     | Tentativas login antes bloqueio |
+| `CORS_ORIGIN`             | `http://localhost:3000` | CORS permitido                  |
+
+---
+
+## 🐳 Docker
+
+```bash
+docker-compose up -d
+```
+
+---
+
+## 📈 Roadmap
+
+- [x] Autenticação refatorada
+- [x] Proteção brute force
+- [x] DTOs e validação
+- [x] Tratamento de erros padronizado
+- [x] Histórico em collection separada
+- [ ] Favoritos (endpoints)
+- [ ] Funções Personalizadas (endpoints)
+- [ ] IoT Measurements (endpoints)
+- [ ] Rate limiting com Redis
+- [ ] Integração com Data Streaming
+
+---
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch: `git checkout -b feature/nome`
+3. Commit: `git commit -am 'Adiciona feature'`
+4. Push: `git push origin feature/nome`
+5. Pull Request
+
+---
+
+## 👥 Colaboradores
+
+- **Rhuan** - Arquitetura e Refatoração
+- **Leonardo** - Features
+- **Mauricio** - Features
+- **Vitor** - Features
+
+---
+
+## 📄 Licença
+
+ISC
+
+---
+
+## 📞 Suporte
+
+Documentação completa em: [/docs/API.md](/docs/API.md)  
+Issues: https://github.com/RHU4N/LoginAPICeos/issues
+
+### Estrutura de dados ST12
+
+Favoritos, funções personalizadas e medições IoT possuem collections, índices,
+DTOs, persistência e endpoints próprios. O diagnóstico da estrutura antiga, os
+ambientes, relacionamentos e índices estão documentados em
+[docs/DATABASE.md](docs/DATABASE.md).

@@ -1,25 +1,77 @@
-const jwt = require("jsonwebtoken");
+/**
+ * Middleware de Autenticação
+ * Valida access token e extrai userId
+ */
 
-function auth(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  console.log('[AuthMiddleware] authorization header:', authHeader);
-  const token = authHeader && authHeader.split(" ")[1];
+const JwtTokenProvider = require("../providers/JwtTokenProvider");
+const {
+  InvalidTokenError,
+  TokenExpiredError,
+} = require("../../errors/AppError");
 
-  if (!token) {
-    console.log('[AuthMiddleware] no token provided');
-    return res.status(401).json({ error: "Token não fornecido" });
-  }
+const jwtProvider = new JwtTokenProvider();
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      console.log('[AuthMiddleware] jwt.verify error:', err && err.message);
-      return res.status(403).json({ error: "Token inválido" });
+function authMiddleware(req, res, next) {
+  try {
+    const authHeader = req.headers["authorization"];
+    const cookieToken = req.cookies?.accessToken;
+
+    if (!authHeader && !cookieToken) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "NO_TOKEN",
+          message: "Token não fornecido",
+        },
+      });
     }
 
-    console.log('[AuthMiddleware] token valid, decoded payload:', user);
-    req.userId = user.id;
-    next();
-  });
+    const parts = authHeader ? authHeader.split(" ") : null;
+    if (authHeader && (parts.length !== 2 || parts[0] !== "Bearer")) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN_FORMAT",
+          message: "Formato de token inválido. Use: Bearer <token>",
+        },
+      });
+    }
+
+    const token = cookieToken || parts[1];
+
+    try {
+      const decoded = jwtProvider.verifyAccessToken(token);
+      req.userId = decoded.id;
+      req.userEmail = decoded.email;
+      req.userRole = decoded.role || "USER";
+      next();
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: "TOKEN_EXPIRED",
+            message: "Token expirado. Faça refresh do token.",
+          },
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Token inválido",
+        },
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "AUTH_ERROR",
+        message: "Erro ao autenticar",
+      },
+    });
+  }
 }
 
-module.exports = auth;
+module.exports = authMiddleware;

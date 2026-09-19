@@ -1,0 +1,12 @@
+const router = require("express").Router();
+const auth = require("../../infrastructure/middleware/AuthMiddleware");
+const Controller = require("../controllers/IoTController");
+const UseCases = require("../../application/use_cases/IoTUseCases");
+const Repository = require("../../infrastructure/repositories/IoTMeasurementRepositoryImpl");
+const controller = new Controller(new UseCases(new Repository()));
+router.post("/measurements", auth, (req, res, next) => controller.create(req, res, next));
+router.get("/measurements", auth, (req, res, next) => controller.list(req, res, next));
+router.get("/measurements/:id", auth, (req, res, next) => controller.get(req, res, next));
+router.get("/devices/:deviceId/measurements", auth, (req, res, next) => { req.query.deviceId = req.params.deviceId; controller.list(req, res, next); });
+router.get("/sensors/:sensorId/measurements", auth, (req, res, next) => { req.query.sensorId = req.params.sensorId; controller.list(req, res, next); });
+module.exports = router;

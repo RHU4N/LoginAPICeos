@@ -1,63 +1,153 @@
-require('dotenv').config(); // Certifique-se de que esta linha está no início do arquivo
+/**
+ * LoginAPICeos - Ponto de entrada principal
+ * Refatorado com nova arquitetura segura e escalável
+ */
 
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+// DEVE SER A PRIMEIRA LINHA: carregar variáveis de ambiente
+require("dotenv").config();
+
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+
+// Importar configurações centralizadas
+const environment = require("./src/config/environment");
+const { connectDatabase } = require("./src/config/database");
+const authConfig = require("./src/config/auth");
+const errorHandler = require("./src/infrastructure/middleware/ErrorHandler");
+
+// Criar app Express
 const app = express();
-const port = process.env.PORT || 8081;
 
-// Ensure JWT_SECRET is set. In local/dev, fall back to a development secret
-if (!process.env.JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET não está definido. Verifique o arquivo .env ou as variáveis de ambiente.');
-    process.exit(1);
-  }
-  console.warn('Aviso: JWT_SECRET não definido — usando segredo de desenvolvimento temporário.');
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_local';
-}
-
-// Inicializa conexão com o banco (skip when running tests)
-if (process.env.NODE_ENV !== 'test') {
-  require('./src/infrastructure/db/db');
-}
-
-// Middlewares globais
-app.use(bodyParser.json());
-app.use(cors());
-
-// Simple request logger for local debugging
-app.use((req, res, next) => {
-  console.log('[Request] ', req.method, req.path, 'headers:', { authorization: req.headers.authorization });
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
   next();
 });
 
-// Rotas de teste
-app.get('/', (req, res) => res.send('Estou aqui'));
-
-// Importa rotas (interface_adapters/routes)
-const userRoutes = require('./src/interfaces/routes/UserRoutes');
-const authRoutes = require('./src/interfaces/routes/AuthRoutes');
-const { setupSwagger } = require('./swagger/swaggerDocs');
-
-// Usa as rotas
-app.use('/users', userRoutes); // CRUD de usuários
-app.use('/auth', authRoutes);  // login / verify
-
-// Swagger (docs)
-setupSwagger(app);
-
-// Middleware global de erro com mapeamento de erros de domínio
-app.use((err, req, res, next) => {
-  console.error(err && err.stack ? err.stack : err);
-  // Errors from domain layer may expose a `status` property or `name`
-  const status = err && err.status ? err.status : (err && err.name === 'ValidationError' ? 422 : 500);
-  const message = (err && err.publicMessage) || (err && err.message) || 'Internal Server Error';
-  res.status(status).json({ success: false, error: { message } });
+// Parser pequeno para cookies; evita depender de dados de autenticação no body.
+app.use((req, _res, next) => {
+  req.cookies = Object.fromEntries(
+    (req.headers.cookie || "").split(";").filter(Boolean).map((part) => {
+      const separator = part.indexOf("=");
+      return [decodeURIComponent(part.slice(0, separator).trim()), decodeURIComponent(part.slice(separator + 1).trim())];
+    }).filter(([name]) => name),
+  );
+  next();
 });
 
-// Start server only if run directly. This allows tests to require the app without starting a listener.
+// ============================================================================
+// MIDDLEWARES GLOBAIS
+// ============================================================================
+
+// Body parser
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
+
+// CORS
+app.use(cors(authConfig.cors));
+
+// Log de requisições (desenvolvimento)
+if (environment.isDevelopment()) {
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+}
+
+// Health check
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      status: "OK",
+      environment: environment.NODE_ENV,
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// Raiz
+app.get("/", (req, res) => {
+  res.json({
+    message: "LoginAPICeos - API de Autenticação",
+    status: "Estou aqui",
+    version: "2.0.0",
+    environment: environment.NODE_ENV,
+  });
+});
+
+// ============================================================================
+// ROTAS
+// ============================================================================
+
+const authRoutes = require("./src/interfaces/routes/AuthRoutes");
+const userRoutes = require("./src/interfaces/routes/UserRoutes");
+const favoriteRoutes = require("./src/interfaces/routes/FavoriteRoutes");
+const customFunctionRoutes = require("./src/interfaces/routes/CustomFunctionRoutes");
+const iotRoutes = require("./src/interfaces/routes/IoTRoutes");
+const historicoRoutes = require("./src/interfaces/routes/HistoricoRoutes");
+
+app.use("/auth", authRoutes);
+app.use("/users", userRoutes);
+app.use("/favorites", favoriteRoutes);
+app.use("/custom-functions", customFunctionRoutes);
+app.use("/iot", iotRoutes);
+app.use("/historicos", historicoRoutes);
+
+// Swagger/API Docs
+const { setupSwagger } = require("./swagger/swaggerDocs");
+setupSwagger(app);
+
+// ============================================================================
+// TRATAMENTO DE ERROS
+// ============================================================================
+
+// 404 - Rota não encontrada
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: "NOT_FOUND",
+      message: "Endpoint não encontrado",
+    },
+  });
+});
+
+// Handler de erros global
+app.use(errorHandler);
+
+// ============================================================================
+// INICIALIZAÇÃO
+// ============================================================================
+
+/**
+ * Conectar ao banco e iniciar servidor (apenas se executado direto)
+ */
+async function startServer() {
+  try {
+    // Conectar ao banco de dados
+    await connectDatabase();
+
+    // Iniciar server
+    const port = environment.PORT;
+    app.listen(port, () => {
+      console.log(`\n✅ Servidor rodando na porta ${port}`);
+      console.log(`🌍 Ambiente: ${environment.NODE_ENV}`);
+      console.log(`📚 Documentação: http://localhost:${port}/api-docs\n`);
+    });
+  } catch (error) {
+    console.error("❌ Erro ao iniciar servidor:", error.message);
+    process.exit(1);
+  }
+}
+
+// Iniciar apenas se for executado diretamente (não importado)
 if (require.main === module) {
-  app.listen(port, () => console.log(`Servidor rodando na porta ${port}!`));
+  startServer();
 }
 
 module.exports = app;

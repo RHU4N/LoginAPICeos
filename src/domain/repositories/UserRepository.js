@@ -1,12 +1,51 @@
-// Interface para UserRepository
+/**
+ * UserRepository - Interface do repositório de usuários
+ */
+
 class UserRepository {
-    async findAll() { throw new Error('Not implemented'); }
-    async findById(id) { throw new Error('Not implemented'); }
-    async findByEmail(email) { throw new Error('Not implemented'); }
-    async create(user) { throw new Error('Not implemented'); }
-    async update(id, user) { throw new Error('Not implemented'); }
-    async delete(id) { throw new Error('Not implemented'); }
-    async addHistorico(userId, historico) { throw new Error('Not implemented'); }
-    async getHistorico(userId) { throw new Error('Not implemented'); }
+  async findAll() {
+    throw new Error("Not implemented");
+  }
+
+  async findById(id) {
+    throw new Error("Not implemented");
+  }
+
+  async findByIdWithPassword(id) {
+    throw new Error("Not implemented");
+  }
+
+  async findByEmail(email) {
+    throw new Error("Not implemented");
+  }
+
+  async create(user) {
+    throw new Error("Not implemented");
+  }
+
+  async update(id, user) {
+    throw new Error("Not implemented");
+  }
+
+  async delete(id) {
+    throw new Error("Not implemented");
+  }
+
+  async addHistorico(userId, historico) {
+    throw new Error("Not implemented");
+  }
+
+  async getHistorico(userId) {
+    throw new Error("Not implemented");
+  }
+
+  async clearHistorico(userId) {
+    throw new Error("Not implemented");
+  }
+
+  async deleteHistoricoItem(userId, historicoId) {
+    throw new Error("Not implemented");
+  }
 }
+
 module.exports = UserRepository;

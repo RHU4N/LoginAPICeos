@@ -1,83 +1,171 @@
+/**
+ * UserUseCases - Operações relacionadas a usuários
+ */
+
 const {
-    UserNotFoundError,
-    MissingFieldsError,
-} = require('../errors/UserErrors')
-const jwt = require('jsonwebtoken'); // Importando jsonwebtoken
+  UserNotFoundError,
+  MissingFieldsError,
+} = require("../errors/UserErrors");
+const {
+  ValidationError,
+  DuplicateEmailError,
+} = require("../../errors/AppError");
 
 class UserUseCases {
-    constructor(userRepository, passwordHasher) {
-        this.userRepository = userRepository;
-        this.passwordHasher = passwordHasher;
+  constructor(userRepository, passwordHasher) {
+    this.userRepository = userRepository;
+    this.passwordHasher = passwordHasher;
+  }
+
+  /**
+   * Listar todos os usuários (sem senhas)
+   */
+  async getAllUsers() {
+    return await this.userRepository.findAll();
+  }
+
+  /**
+   * Buscar usuário por email
+   */
+  async getUserByEmail(email) {
+    if (!email) throw new ValidationError("Email é obrigatório");
+    return await this.userRepository.findByEmail(email);
+  }
+
+  /**
+   * Buscar usuário por ID
+   */
+  async getUserById(id) {
+    if (!id) throw new ValidationError("ID é obrigatório");
+    const user = await this.userRepository.findById(id);
+    if (!user) throw new UserNotFoundError();
+    return user;
+  }
+
+  /**
+   * Buscar usuário por ID COM SENHA (para validação)
+   */
+  async getUserByIdWithPassword(id) {
+    if (!id) throw new ValidationError("ID é obrigatório");
+    return await this.userRepository.findByIdWithPassword(id);
+  }
+
+  /**
+   * Registrar novo usuário
+   */
+  async registerUser(data) {
+    const { nome, email, senha, telefone, assinante } = data;
+
+    // Validar campos obrigatórios
+    if (!nome || !email || !senha || !telefone) {
+      throw new MissingFieldsError();
     }
 
-    async getAllUsers() {
-        return await this.userRepository.findAll();
+    // Verificar se email já está em uso
+    const userExistente = await this.userRepository.findByEmail(email);
+    if (userExistente) {
+      throw new DuplicateEmailError();
     }
 
-    async getUserByEmail(email) {
-        return await this.userRepository.findByEmail(email);
+    // Validar força de senha
+    if (!this.passwordHasher.isStrong(senha)) {
+      throw new ValidationError(
+        `Senha fraca. Requisitos: ${this.passwordHasher.getRequirements()}`,
+      );
     }
 
-    async getUserById(id) {
-        const user = await this.userRepository.findById(id);
-        if (!user) throw new UserNotFoundError();
-        return user;
+    // Hash de senha
+    const senhaHash = await this.passwordHasher.hash(senha);
+
+    // Criar usuário
+    return await this.userRepository.create({
+      nome,
+      email: email.toLowerCase(),
+      senhaHash,
+      telefone,
+      assinante: assinante || false,
+      ativo: true,
+      criadoEm: new Date(),
+      atualizadoEm: new Date(),
+    });
+  }
+
+  /**
+   * Atualizar dados do usuário (NÃO senha)
+   */
+  async updateUser(id, data) {
+    if (!id) throw new ValidationError("ID é obrigatório");
+
+    const user = await this.getUserById(id);
+
+    // Remover campos que não devem ser atualizados diretamente
+    const {
+      senhaHash,
+      tentativasLogin,
+      bloqueadoAte,
+      tokenVersion,
+      role,
+      ...updateData
+    } = data;
+
+    // Se email está sendo atualizado, verificar duplicação
+    if (updateData.email && updateData.email !== user.email) {
+      const userExistente = await this.userRepository.findByEmail(
+        updateData.email,
+      );
+      if (userExistente) {
+        throw new DuplicateEmailError();
+      }
     }
 
-    async registerUser(data) {
-        const { nome, email, senha, telefone, assinante, historico } = data;
-        if (!nome || !email || !senha || !telefone) {
-            throw new MissingFieldsError();
-        }
-        const hashedSenha = await this.passwordHasher.hash(senha);
-        return await this.userRepository.create({ nome, email, senha: hashedSenha, telefone, assinante, historico });
+    updateData.atualizadoEm = new Date();
+    return await this.userRepository.update(id, updateData);
+  }
+
+  /**
+   * Deletar usuário
+   */
+  async deleteUser(id) {
+    if (!id) throw new ValidationError("ID é obrigatório");
+    const user = await this.getUserById(id);
+    return await this.userRepository.delete(id);
+  }
+
+  /**
+   * Adicionar entrada ao histórico
+   */
+  async addHistorico(userId, historico) {
+    if (!userId || !historico) {
+      throw new ValidationError("userId e histórico são obrigatórios");
     }
+    return await this.userRepository.addHistorico(userId, historico);
+  }
 
-    async updateUser(id, data) {
-        let updateData = { ...data };
-        if (data.senha) {
-            updateData.senha = await this.passwordHasher.hash(data.senha);
-        }
-        return await this.userRepository.update(id, updateData);
+  /**
+   * Obter histórico do usuário
+   */
+  async getHistorico(userId) {
+    if (!userId) throw new ValidationError("userId é obrigatório");
+    return await this.userRepository.getHistorico(userId);
+  }
+
+  /**
+   * Limpar todo o histórico do usuário
+   */
+  async clearHistorico(userId) {
+    if (!userId) throw new ValidationError("userId é obrigatório");
+    return await this.userRepository.clearHistorico(userId);
+  }
+
+  /**
+   * Deletar um item específico do histórico
+   */
+  async deleteHistoricoItem(userId, historicoId) {
+    if (!userId || !historicoId) {
+      throw new ValidationError("userId e historicoId são obrigatórios");
     }
-
-    async deleteUser(id) {
-        return await this.userRepository.delete(id);
-    }
-
-    async addHistorico(userId, historico) {
-        return await this.userRepository.addHistorico(userId, historico);
-    }
-
-    async getHistorico(userId) {
-        return await this.userRepository.getHistorico(userId);
-    }
-
-    async clearHistorico(userId) {
-        return await this.userRepository.clearHistorico(userId);
-    }
-
-    async deleteHistoricoItem(userId, historicoId) {
-        return await this.userRepository.deleteHistoricoItem(userId, historicoId);
-    }
-
-    async login(email, senha) {
-        const user = await this.userRepository.findByEmail(email);
-        if (!user) {
-            throw new UserNotFoundError();
-        }
-
-        const isPasswordValid = await this.passwordHasher.compare(senha, user.senha);
-        if (!isPasswordValid) {
-            throw new Error('Credenciais inválidas');
-        }
-
-        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
-            expiresIn: '1h',
-        });
-
-        return { token, user: { id: user._id, email: user.email, nome: user.nome } };
-    }
+    return await this.userRepository.deleteHistoricoItem(userId, historicoId);
+  }
 }
 
 module.exports = UserUseCases;

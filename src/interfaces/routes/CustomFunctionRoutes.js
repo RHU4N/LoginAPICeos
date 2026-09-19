@@ -1,0 +1,12 @@
+const router = require("express").Router();
+const auth = require("../../infrastructure/middleware/AuthMiddleware");
+const Controller = require("../controllers/CustomFunctionController");
+const UseCases = require("../../application/use_cases/CustomFunctionUseCases");
+const Repository = require("../../infrastructure/repositories/CustomFunctionRepositoryImpl");
+const controller = new Controller(new UseCases(new Repository()));
+router.post("/", auth, (req, res, next) => controller.create(req, res, next));
+router.get("/", auth, (req, res, next) => controller.list(req, res, next));
+router.get("/:id", auth, (req, res, next) => controller.get(req, res, next));
+router.patch("/:id", auth, (req, res, next) => controller.update(req, res, next));
+router.delete("/:id", auth, (req, res, next) => controller.remove(req, res, next));
+module.exports = router;
