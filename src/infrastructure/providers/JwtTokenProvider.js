@@ -12,7 +12,7 @@ const {
 class JwtTokenProvider {
   generate(payload) {
     if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET não definido");
-    return this.generateAccessToken(payload);
+    return this.generateAccessToken({ ...payload, tokenType: "access" });
   }
   verify(token) { return this.verifyAccessToken(token); }
   /**
@@ -48,8 +48,8 @@ class JwtTokenProvider {
     const payload = { id: userId, email, tokenVersion, role };
 
     return {
-      accessToken: this.generateAccessToken(payload),
-      refreshToken: this.generateRefreshToken(payload),
+      accessToken: this.generateAccessToken({ ...payload, tokenType: "access" }),
+      refreshToken: this.generateRefreshToken({ ...payload, tokenType: "refresh" }),
     };
   }
 
@@ -58,10 +58,12 @@ class JwtTokenProvider {
    */
   verifyAccessToken(token) {
     try {
-      return jwt.verify(token, authConfig.jwt.secret, {
+      const decoded = jwt.verify(token, authConfig.jwt.secret, {
         algorithms: authConfig.jwt.algorithms,
         issuer: "ceos-api",
       });
+      if (decoded.tokenType !== "access") throw new InvalidTokenError();
+      return decoded;
     } catch (error) {
       if (error.name === "TokenExpiredError") {
         throw new TokenExpiredError();
@@ -75,10 +77,12 @@ class JwtTokenProvider {
    */
   verifyRefreshToken(token) {
     try {
-      return jwt.verify(token, authConfig.jwt.secret, {
+      const decoded = jwt.verify(token, authConfig.jwt.secret, {
         algorithms: authConfig.jwt.algorithms,
         issuer: "ceos-api",
       });
+      if (decoded.tokenType !== "refresh") throw new InvalidTokenError();
+      return decoded;
     } catch (error) {
       if (error.name === "TokenExpiredError") {
         throw new TokenExpiredError();

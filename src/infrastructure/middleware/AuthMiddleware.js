@@ -4,6 +4,7 @@
  */
 
 const JwtTokenProvider = require("../providers/JwtTokenProvider");
+const User = require("../../domain/entities/User");
 const {
   InvalidTokenError,
   TokenExpiredError,
@@ -11,7 +12,7 @@ const {
 
 const jwtProvider = new JwtTokenProvider();
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers["authorization"];
     const cookieToken = req.cookies?.accessToken;
@@ -41,9 +42,13 @@ function authMiddleware(req, res, next) {
 
     try {
       const decoded = jwtProvider.verifyAccessToken(token);
-      req.userId = decoded.id;
-      req.userEmail = decoded.email;
-      req.userRole = decoded.role || "USER";
+      const user = await User.findById(decoded.id).select("+tokenVersion +role +ativo");
+      if (!user || user.ativo === false || (decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
+        throw new InvalidTokenError();
+      }
+      req.userId = user._id.toString();
+      req.userEmail = user.email;
+      req.userRole = user.role || "USER";
       next();
     } catch (error) {
       if (error instanceof TokenExpiredError) {

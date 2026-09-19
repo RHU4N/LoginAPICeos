@@ -15,6 +15,7 @@ const environment = require("./src/config/environment");
 const { connectDatabase } = require("./src/config/database");
 const authConfig = require("./src/config/auth");
 const errorHandler = require("./src/infrastructure/middleware/ErrorHandler");
+const csrfMiddleware = require("./src/infrastructure/middleware/CsrfMiddleware");
 
 // Criar app Express
 const app = express();
@@ -37,6 +38,7 @@ app.use((req, _res, next) => {
   );
   next();
 });
+app.use(csrfMiddleware);
 
 // ============================================================================
 // MIDDLEWARES GLOBAIS
