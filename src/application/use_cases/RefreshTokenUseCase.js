@@ -5,6 +5,7 @@
 const {
   InvalidTokenError,
   TokenExpiredError,
+  ValidationError,
 } = require("../../errors/AppError");
 
 class RefreshTokenUseCase {
@@ -18,7 +19,7 @@ class RefreshTokenUseCase {
    */
   async execute(refreshToken) {
     if (!refreshToken) {
-      throw new Error("Refresh token é obrigatório");
+      throw new ValidationError("O refresh token é obrigatório");
     }
 
     try {
@@ -28,7 +29,7 @@ class RefreshTokenUseCase {
       // Buscar usuário
       const user = await this.userUseCases.getUserByIdWithPassword(decoded.id);
       if (!user || user.ativo === false) {
-        throw new Error("Usuário não encontrado ou inativo");
+        throw new InvalidTokenError();
       }
 
       // Verificar se token foi revogado

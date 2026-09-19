@@ -12,6 +12,7 @@ const {
   resetAttempts,
   isAccountBlocked,
 } = require("../../infrastructure/middleware/BruteForceMiddleware");
+const { ValidationError, AuthenticationError } = require("../../errors/AppError");
 
 class LoginUseCase {
   constructor(userUseCases, passwordHasher, tokenProvider) {
@@ -25,7 +26,7 @@ class LoginUseCase {
    */
   async execute(email, senha) {
     if (!email || !senha) {
-      throw new Error("Email e senha são obrigatórios");
+      throw new ValidationError("E-mail e senha são obrigatórios");
     }
 
     // Verificar se conta está bloqueada por brute force
@@ -43,7 +44,7 @@ class LoginUseCase {
     // Verificar se usuário está ativo
     if (user.ativo === false) {
       recordFailedAttempt(email);
-      throw new Error("Usuário inativo");
+      throw new AuthenticationError("Esta conta está inativa", "USER_INACTIVE");
     }
 
     // Validar senha

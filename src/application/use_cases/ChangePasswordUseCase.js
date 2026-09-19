@@ -2,7 +2,7 @@
  * ChangePasswordUseCase - Trocar senha do usuário autenticado
  */
 
-const { ValidationError } = require("../../errors/AppError");
+const { ValidationError, NotFoundError } = require("../../errors/AppError");
 const {
   PasswordSameAsCurrentError,
   InvalidPasswordError,
@@ -25,7 +25,7 @@ class ChangePasswordUseCase {
     // Buscar usuário (com select de senhaHash)
     const user = await this.userUseCases.getUserByIdWithPassword(userId);
     if (!user) {
-      throw new Error("Usuário não encontrado");
+      throw new NotFoundError("Usuário");
     }
 
     // Validar senha atual

@@ -21,6 +21,30 @@ function errorHandler(err, req, res, next) {
     return res.status(err.statusCode).json(err.toJSON());
   }
 
+  // Erros legados da aplicação também informam statusCode; não devem virar 500.
+  if (Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 600) {
+    const codeByStatus = {
+      400: "BAD_REQUEST", 401: "UNAUTHORIZED", 403: "FORBIDDEN",
+      404: "NOT_FOUND", 409: "CONFLICT", 422: "VALIDATION_ERROR",
+    };
+    return res.status(err.statusCode).json({
+      success: false,
+      error: {
+        code: err.errorCode || codeByStatus[err.statusCode] || "REQUEST_ERROR",
+        message: err.message || "Não foi possível concluir a solicitação",
+        statusCode: err.statusCode,
+      },
+    });
+  }
+
+  // JSON malformado enviado no body.
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({
+      success: false,
+      error: { code: "INVALID_JSON", message: "O corpo da requisição contém JSON inválido", statusCode: 400 },
+    });
+  }
+
   // Se for erro de validação do Mongoose
   if (err.name === "ValidationError") {
     return res.status(422).json({
@@ -28,6 +52,7 @@ function errorHandler(err, req, res, next) {
       error: {
         code: "VALIDATION_ERROR",
         message: "Dados inválidos",
+        statusCode: 422,
         details: Object.values(err.errors).map((e) => e.message),
       },
     });
@@ -40,6 +65,7 @@ function errorHandler(err, req, res, next) {
       error: {
         code: "INVALID_ID",
         message: "ID inválido",
+        statusCode: 400,
       },
     });
   }
@@ -51,7 +77,8 @@ function errorHandler(err, req, res, next) {
       success: false,
       error: {
         code: "DUPLICATE_FIELD",
-        message: `${field} já está em uso`,
+        message: `O campo ${field} já está em uso`,
+        statusCode: 409,
       },
     });
   }
@@ -63,6 +90,7 @@ function errorHandler(err, req, res, next) {
       error: {
         code: "INVALID_TOKEN",
         message: "Token inválido",
+        statusCode: 401,
       },
     });
   }
@@ -72,8 +100,8 @@ function errorHandler(err, req, res, next) {
     success: false,
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "Erro interno do servidor",
-      ...(environment.isDevelopment() && { debug: err.message }),
+      message: "Ocorreu um erro interno. Tente novamente mais tarde.",
+      statusCode: 500,
     },
   });
 }
