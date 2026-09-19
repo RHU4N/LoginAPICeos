@@ -98,9 +98,11 @@ app.use("/custom-functions", customFunctionRoutes);
 app.use("/iot", iotRoutes);
 app.use("/historicos", historicoRoutes);
 
-// Swagger/API Docs
-const { setupSwagger } = require("./swagger/swaggerDocs");
-setupSwagger(app);
+// Swagger/API Docs: ativado localmente por padrão; desativado em produção.
+if (environment.ENABLE_SWAGGER) {
+  const { setupSwagger } = require("./swagger/swaggerDocs");
+  setupSwagger(app);
+}
 
 // ============================================================================
 // TRATAMENTO DE ERROS

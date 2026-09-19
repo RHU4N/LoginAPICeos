@@ -73,6 +73,13 @@ const environment = {
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:3000",
 
+  // A documentação interativa é útil localmente, mas não deve ficar pública
+  // em produção sem uma proteção adicional.
+  ENABLE_SWAGGER:
+    process.env.ENABLE_SWAGGER === undefined
+      ? (process.env.NODE_ENV || "development") === "development"
+      : process.env.ENABLE_SWAGGER === "true",
+
   // Logs
   LOG_LEVEL:
     process.env.LOG_LEVEL ||
