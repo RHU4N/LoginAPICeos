@@ -1,3 +1,5 @@
+// Controller de Autenticação (Login)
+const successResponse = require('../responses/successResponse');
 /**
  * AuthController - Controlador de Autenticação
  * Responsável por orquestrar requisições HTTP para operações de autenticação
@@ -156,6 +158,14 @@ class AuthController {
       const { UserResponseDTO } = require("../../dto");
       const response = new UserResponseDTO(user);
 
+    async login(req, res) {
+        try {
+            const { email, senha } = req.body;
+            const token = await this.loginUseCase.execute(email, senha);
+            return successResponse(res, { token }, 'Login realizado com sucesso');
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
       return res.status(200).json({
         success: true,
         data: response,

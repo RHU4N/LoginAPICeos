@@ -19,6 +19,8 @@ const csrfMiddleware = require("./src/infrastructure/middleware/CsrfMiddleware")
 
 // Criar app Express
 const app = express();
+const port = process.env.PORT || 8081;
+const successResponse = require('./src/interfaces/responses/successResponse');
 
 app.disable("x-powered-by");
 app.use((_req, res, next) => {
@@ -82,6 +84,8 @@ app.get("/", (req, res) => {
   });
 });
 
+// Rotas de teste
+app.get('/', (req, res) => successResponse(res, null, 'API disponível'));
 // ============================================================================
 // ROTAS
 // ============================================================================
