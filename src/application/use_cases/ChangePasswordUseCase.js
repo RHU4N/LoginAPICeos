@@ -2,11 +2,12 @@
  * ChangePasswordUseCase - Trocar senha do usuário autenticado
  */
 
-const { ValidationError, NotFoundError } = require("../../errors/AppError");
 const {
-  PasswordSameAsCurrentError,
+  ValidationError,
+  NotFoundError,
   InvalidPasswordError,
-} = require("../errors/AuthErrors");
+  PasswordSameAsCurrentError,
+} = require("../../errors/AppError");
 
 class ChangePasswordUseCase {
   constructor(userUseCases, passwordHasher) {
