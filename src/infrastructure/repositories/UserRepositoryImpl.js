@@ -1,62 +1,127 @@
-const mongoose = require('mongoose');
-const User = require('../../domain/entities/User');
-const UserRepository = require('../../domain/repositories/UserRepository');
+/**
+ * UserRepositoryImpl - Implementação do repositório de usuários
+ */
+
+const mongoose = require("mongoose");
+const User = require("../../domain/entities/User");
+const UserRepository = require("../../domain/repositories/UserRepository");
+const Historico = require("../../domain/entities/Historico");
 
 class UserRepositoryImpl extends UserRepository {
-    async findAll() {
-        return await User.find().select('-senha');
-    }
-    async findById(id) {
-        return await User.findById(id).select('-senha');
-    }
-    async findByEmail(email) {
-        return await User.findOne({ email });
-    }
-    async create(userData) {
-        const user = new User(userData);
-        return await user.save();
-    }
-    async update(id, userData) {
-        return await User.findByIdAndUpdate(id, userData);
-    }
-    async delete(id) {
-        return await User.findByIdAndDelete(id);
-    }
-    async addHistorico(userId, historico) {
-        if (!mongoose.Types.ObjectId.isValid(userId)) return null;
-        const user = await User.findById(userId);
-        if (!user) return null;
-        user.historico.push(historico);
-        await user.save();
-        return user;
-    }
-    async getHistorico(userId) {
-        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
-        const user = await User.findById(userId).select('historico');
-        return user ? user.historico : [];
-    }
-    async clearHistorico(userId) {
-        // Remove all historico entries for the user
-        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
-        const updated = await User.findByIdAndUpdate(
-            userId,
-            { $set: { historico: [] } },
-            { new: true }
-        ).select('historico');
-        return updated ? updated.historico : [];
-    }
+  /**
+   * Listar todos os usuários (sem senhas)
+   */
+  async findAll() {
+    return await User.find().select(
+      "-senhaHash -tentativasLogin -bloqueadoAte -tokenVersion -role",
+    );
+  }
 
-    async deleteHistoricoItem(userId, historicoId) {
-        // Pull the subdocument with the provided _id from historico
-        if (!mongoose.Types.ObjectId.isValid(userId)) return [];
-        // historicoId is a subdocument id; guard against invalid ids but still attempt the pull
-        const updated = await User.findByIdAndUpdate(
-            userId,
-            { $pull: { historico: { _id: historicoId } } },
-            { new: true }
-        ).select('historico');
-        return updated ? updated.historico : [];
+  /**
+   * Buscar usuário por ID (sem senha)
+   */
+  async findById(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    return await User.findById(id).select(
+      "-senhaHash -tentativasLogin -bloqueadoAte -tokenVersion -role",
+    );
+  }
+
+  /**
+   * Buscar usuário por ID COM SENHA (para validação)
+   */
+  async findByIdWithPassword(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    return await User.findById(id).select("+senhaHash +tokenVersion +role");
+  }
+
+  /**
+   * Buscar usuário por email (com senha para login)
+   */
+  async findByEmail(email) {
+    if (!email) return null;
+    return await User.findOne({ email: email.toLowerCase() }).select(
+      "+senhaHash +tentativasLogin +bloqueadoAte +tokenVersion +role",
+    );
+  }
+
+  /**
+   * Criar novo usuário
+   */
+  async create(userData) {
+    const user = new User(userData);
+    return await user.save();
+  }
+
+  /**
+   * Atualizar usuário
+   */
+  async update(id, userData) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    return await User.findByIdAndUpdate(id, userData, { new: true }).select(
+      "-senhaHash -tentativasLogin -bloqueadoAte -tokenVersion -role",
+    );
+  }
+
+  /**
+   * Deletar usuário
+   */
+  async delete(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    // Deletar usuário e seu histórico
+    await Historico.deleteMany({ userId: id });
+    return await User.findByIdAndDelete(id);
+  }
+
+  /**
+   * Adicionar entrada ao histórico
+   */
+  async addHistorico(userId, historicoData) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) return null;
+
+    const historico = new Historico({
+      userId,
+      ...historicoData,
+    });
+
+    await historico.save();
+
+    // Atualizar contador no usuário
+    await User.findByIdAndUpdate(userId, { $inc: { countFavoritos: 0 } });
+
+    return historico;
+  }
+
+  /**
+   * Obter histórico do usuário
+   */
+  async getHistorico(userId) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) return [];
+    return await Historico.find({ userId }).sort({ criadoEm: -1 });
+  }
+
+  /**
+   * Limpar todo o histórico do usuário
+   */
+  async clearHistorico(userId) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) return [];
+    await Historico.deleteMany({ userId });
+    return [];
+  }
+
+  /**
+   * Deletar item específico do histórico
+   */
+  async deleteHistoricoItem(userId, historicoId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(userId) ||
+      !mongoose.Types.ObjectId.isValid(historicoId)
+    ) {
+      return [];
     }
+    await Historico.deleteOne({ _id: historicoId, userId });
+    return await Historico.find({ userId }).sort({ criadoEm: -1 });
+  }
 }
 
 module.exports = UserRepositoryImpl;
