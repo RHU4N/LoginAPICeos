@@ -53,6 +53,61 @@ describe("respostas dos controllers", () => {
     expect(res.cookies).toHaveLength(2);
   });
 
+  test("refresh, logout, alteração de senha e /me mantêm o contrato de sucesso", async () => {
+    const sessionUser = { ...user, save: jest.fn() };
+    const refreshTokenUseCase = {
+      execute: jest.fn().mockResolvedValue({
+        accessToken: "new-access-token",
+        refreshToken: "new-refresh-token",
+        expiresIn: "15m",
+      }),
+    };
+    const changePasswordUseCase = {
+      execute: jest.fn().mockResolvedValue({ message: "Senha alterada com sucesso" }),
+      userUseCases: {
+        getUserById: jest.fn().mockResolvedValue(sessionUser),
+        getUserByIdWithPassword: jest.fn().mockResolvedValue(sessionUser),
+      },
+    };
+    const controller = new AuthController({}, refreshTokenUseCase, changePasswordUseCase);
+    const next = jest.fn();
+
+    const refresh = responseDouble();
+    await controller.refresh({ cookies: { refreshToken: "refresh-token" }, body: {} }, refresh, next);
+    expect(refresh.body).toEqual({
+      success: true,
+      message: "Sessão renovada com sucesso",
+      data: { expiresIn: "15m" },
+    });
+    expect(refresh.cookies).toHaveLength(2);
+
+    const me = responseDouble();
+    await controller.getMe({ userId: "u1" }, me, next);
+    expect(me.body).toMatchObject({ success: true, data: { id: "u1", email: user.email } });
+    expect(me.body.data).not.toHaveProperty("senhaHash");
+
+    const changePassword = responseDouble();
+    await controller.changePassword({
+      userId: "u1",
+      body: { senhaAtual: "Senha123!", novaSenha: "OutraSenha1!", confirmaNovaSenha: "OutraSenha1!" },
+    }, changePassword, next);
+    expect(changePassword.body).toEqual({
+      success: true,
+      message: "Senha alterada com sucesso",
+      data: null,
+    });
+
+    const logout = responseDouble();
+    await controller.logout({ userId: "u1" }, logout, next);
+    expect(logout.body).toEqual({
+      success: true,
+      message: "Logout realizado com sucesso",
+      data: null,
+    });
+    expect(logout.clearedCookies).toHaveLength(2);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   test("consultas e alterações de usuário usam dados públicos e status corretos", async () => {
     const useCases = {
       getAllUsers: jest.fn().mockResolvedValue([user]),
