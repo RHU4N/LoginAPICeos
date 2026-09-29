@@ -21,7 +21,7 @@ const UserSchema = new Schema(
       required: [true, "Email é obrigatório"],
       lowercase: true,
       trim: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, "Email inválido"],
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Email inválido"],
       unique: true,
       sparse: true,
       index: true,

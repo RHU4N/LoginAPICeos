@@ -61,7 +61,7 @@ const authController = new AuthController(
  * Autenticar usuário com email e senha
  */
 router.post("/login", bruteForceMiddleware, (req, res, next) => {
-  authController.login(req, res).catch(next);
+  return authController.login(req, res, next);
 });
 
 /**
@@ -69,7 +69,7 @@ router.post("/login", bruteForceMiddleware, (req, res, next) => {
  * Renovar access token usando refresh token
  */
 router.post("/refresh", (req, res, next) => {
-  authController.refresh(req, res).catch(next);
+  return authController.refresh(req, res, next);
 });
 
 /**
@@ -77,7 +77,7 @@ router.post("/refresh", (req, res, next) => {
  * Logout do usuário (revogar refresh tokens)
  */
 router.post("/logout", authMiddleware, (req, res, next) => {
-  authController.logout(req, res).catch(next);
+  return authController.logout(req, res, next);
 });
 
 /**
@@ -85,7 +85,7 @@ router.post("/logout", authMiddleware, (req, res, next) => {
  * Trocar senha do usuário autenticado
  */
 router.post("/change-password", authMiddleware, (req, res, next) => {
-  authController.changePassword(req, res).catch(next);
+  return authController.changePassword(req, res, next);
 });
 
 /**
@@ -93,7 +93,7 @@ router.post("/change-password", authMiddleware, (req, res, next) => {
  * Obter dados do usuário autenticado
  */
 router.get("/me", authMiddleware, (req, res, next) => {
-  authController.getMe(req, res).catch(next);
+  return authController.getMe(req, res, next);
 });
 
 module.exports = router;

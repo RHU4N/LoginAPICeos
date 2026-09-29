@@ -8,15 +8,15 @@ const authMiddleware = require("../../infrastructure/middleware/AuthMiddleware")
 const HistoricoController = require("../controllers/HistoricoController");
 
 // Controllers
-const userRepository = require("../../infrastructure/repositories/UserRepositoryImpl");
-const historicoController = new HistoricoController(userRepository);
+const UserRepositoryImpl = require("../../infrastructure/repositories/UserRepositoryImpl");
+const historicoController = new HistoricoController(new UserRepositoryImpl());
 
 /**
  * POST /historicos
  * Adicionar entrada ao histórico
  */
 router.post("/", authMiddleware, (req, res, next) => {
-  historicoController.add(req, res).catch(next);
+  return historicoController.add(req, res, next);
 });
 
 /**
@@ -24,7 +24,7 @@ router.post("/", authMiddleware, (req, res, next) => {
  * Listar histórico do usuário
  */
 router.get("/", authMiddleware, (req, res, next) => {
-  historicoController.list(req, res).catch(next);
+  return historicoController.list(req, res, next);
 });
 
 /**
@@ -32,7 +32,7 @@ router.get("/", authMiddleware, (req, res, next) => {
  * Deletar item do histórico
  */
 router.delete("/:id", authMiddleware, (req, res, next) => {
-  historicoController.delete(req, res).catch(next);
+  return historicoController.delete(req, res, next);
 });
 
 /**
@@ -40,7 +40,7 @@ router.delete("/:id", authMiddleware, (req, res, next) => {
  * Limpar todo o histórico
  */
 router.delete("/", authMiddleware, (req, res, next) => {
-  historicoController.clear(req, res).catch(next);
+  return historicoController.clear(req, res, next);
 });
 
 module.exports = router;

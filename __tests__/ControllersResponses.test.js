@@ -172,4 +172,21 @@ describe("respostas dos controllers", () => {
     expect(clear.body).toEqual({ success: true, message: "Histórico limpo com sucesso", data: null });
     expect(next).not.toHaveBeenCalled();
   });
+
+  test("histórico aceita resultado matemático igual a zero", async () => {
+    const repository = { addHistorico: jest.fn().mockResolvedValue({ _id: "h-zero", resultado: 0 }) };
+    const controller = new HistoricoController(repository);
+    const res = responseDouble();
+    const next = jest.fn();
+
+    await controller.add(
+      { userId: "u1", body: { tipo: "subtracao", valores: "1,1", resultado: 0 } },
+      res,
+      next,
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(201);
+    expect(res.body.data).toMatchObject({ resultado: 0 });
+  });
 });

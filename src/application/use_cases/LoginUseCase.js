@@ -5,14 +5,17 @@
 const {
   UserNotFoundError,
   InvalidPasswordError,
-  UserBlockedError,
 } = require("../errors/AuthErrors");
 const {
   recordFailedAttempt,
   resetAttempts,
   isAccountBlocked,
 } = require("../../infrastructure/middleware/BruteForceMiddleware");
-const { ValidationError, AuthenticationError } = require("../../errors/AppError");
+const {
+  ValidationError,
+  AuthenticationError,
+  UserBlockedError,
+} = require("../../errors/AppError");
 
 class LoginUseCase {
   constructor(userUseCases, passwordHasher, tokenProvider) {
@@ -75,10 +78,12 @@ class LoginUseCase {
       accessToken,
       refreshToken,
       user: {
-        id: user._id,
+        id: user.id || user._id?.toString?.() || user._id,
         nome: user.nome,
         email: user.email,
+        telefone: user.telefone,
         assinante: user.assinante,
+        ativo: user.ativo,
       },
     };
   }

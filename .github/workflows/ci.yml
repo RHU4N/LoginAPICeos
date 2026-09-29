@@ -9,34 +9,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-only-not-a-production-secret-please-change
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Ensure JWT_SECRET and MONGO_URI are available (secrets or vars)
-        run: |
-          if [ -z "${{ secrets.JWT_SECRET }}" ] && [ -z "${{ vars.JWT_SECRET }}" ]; then
-            echo "::error::Required secret/var JWT_SECRET is not set. Aborting tests."
-            exit 1
-          fi
-          if [ -z "${{ secrets.MONGO_URI }}" ] && [ -z "${{ vars.MONGO_URI }}" ]; then
-            echo "::error::Required secret/var MONGO_URI is not set. Aborting tests."
-            exit 1
-          fi
-          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
-            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
-          else
-            echo "JWT_SECRET=${{ vars.JWT_SECRET }}" >> $GITHUB_ENV
-          fi
-          if [ -n "${{ secrets.MONGO_URI }}" ]; then
-            echo "mongoUri=${{ secrets.MONGO_URI }}" >> $GITHUB_ENV
-          else
-            echo "mongoUri=${{ vars.MONGO_URI }}" >> $GITHUB_ENV
-          fi
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run tests
         run: npm test -- --runInBand
       - name: Run build (if any)
@@ -118,7 +101,9 @@ jobs:
           - 27017:27017
     env:
       MONGO_URI: mongodb://127.0.0.1:27017/ceos_ci
-      JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
+      MONGODB_DATABASE: ceos_ci
+      NODE_ENV: test
+      JWT_SECRET: ci-only-not-a-production-secret-please-change
       PORT: 8081
     steps:
       - uses: actions/checkout@v4
@@ -185,6 +170,16 @@ jobs:
     name: Newman - Login tests (integration)
     needs: build
     runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+    env:
+      MONGO_URI: mongodb://127.0.0.1:27017/ceos_ci_newman
+      MONGODB_DATABASE: ceos_ci_newman
+      NODE_ENV: test
+      JWT_SECRET: ci-only-not-a-production-secret-please-change
     steps:
       - uses: actions/checkout@v4
 
@@ -195,25 +190,11 @@ jobs:
 
       - name: Install dependencies (loginAPI)
         run: |
-          npm install --no-audit --no-fund
-
-      - name: Ensure required secrets/vars present (double-check)
-        run: |
-          if [ -z "${{ secrets.JWT_SECRET }}" ] && [ -z "${{ vars.JWT_SECRET }}" ]; then
-            echo "::error::Required secret/var JWT_SECRET is not set. Aborting Newman tests."
-            exit 1
-          fi
-          if [ -z "${{ secrets.MONGO_URI }}" ] && [ -z "${{ vars.MONGO_URI }}" ]; then
-            echo "::error::Required secret/var MONGO_URI is not set. Aborting Newman tests."
-            exit 1
-          fi
+          npm ci --no-audit --no-fund
 
       - name: Start loginAPI server (integration)
         env:
-          MONGO_URI: ${{ secrets.MONGO_URI || vars.MONGO_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET || vars.JWT_SECRET }}
           PORT: 8081
-          NODE_ENV: development
         run: |
           touch server.log || true
           node index.js > ./server.log 2>&1 &

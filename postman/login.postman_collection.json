@@ -22,6 +22,9 @@
             "exec": [
               "pm.test('User created', function () {",
               "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data).to.have.property('id');",
               "});"
             ]
           }
@@ -37,7 +40,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nome\": \"Test User\",\n  \"email\": \"{{emailVar}}\",\n  \"senha\": \"senha123\",\n  \"telefone\": \"000000000\"\n}"
+          "raw": "{\n  \"nome\": \"Test User\",\n  \"email\": \"{{emailVar}}\",\n  \"senha\": \"Senha123!\",\n  \"confirmaSenha\": \"Senha123!\",\n  \"telefone\": \"11999999999\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/users",
@@ -57,10 +60,14 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Login successful and token returned', function () {",
+              "pm.test('Login successful with public user and HttpOnly cookies', function () {",
               "  pm.response.to.have.status(200);",
               "  var json = pm.response.json();",
-              "  pm.expect(json).to.have.property('token');",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data).to.have.property('user');",
+              "  pm.expect(json.data.user).to.have.property('id');",
+              "  pm.expect(json.data.user).to.not.have.property('senhaHash');",
+              "  pm.expect(pm.response.headers.get('Set-Cookie')).to.include('accessToken=');",
               "});"
             ]
           }
@@ -76,7 +83,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"{{emailVar}}\",\n  \"senha\": \"senha123\"\n}"
+          "raw": "{\n  \"email\": \"{{emailVar}}\",\n  \"senha\": \"Senha123!\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/auth/login",

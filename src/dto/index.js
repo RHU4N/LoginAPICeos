@@ -69,7 +69,7 @@ class ChangePasswordDTO {
 
 class UserResponseDTO {
   constructor(user) {
-    this.id = user._id;
+    this.id = user.id || user._id?.toString?.() || user._id;
     this.nome = user.nome;
     this.email = user.email;
     this.telefone = user.telefone;
@@ -105,7 +105,7 @@ class CreateUserDTO {
     }
     if (
       !this.email ||
-      !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(this.email)
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)
     ) {
       throw new ValidationError("Email inválido");
     }
@@ -162,7 +162,9 @@ class AddHistoricoDTO {
   validate() {
     if (!this.tipo) throw new ValidationError("Tipo é obrigatório");
     if (!this.valores) throw new ValidationError("Valores é obrigatório");
-    if (!this.resultado) throw new ValidationError("Resultado é obrigatório");
+    if (this.resultado === undefined || this.resultado === null) {
+      throw new ValidationError("Resultado é obrigatório");
+    }
   }
 }
 

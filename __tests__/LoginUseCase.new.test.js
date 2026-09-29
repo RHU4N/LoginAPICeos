@@ -4,6 +4,10 @@
 
 const LoginUseCase = require("../src/application/use_cases/LoginUseCase");
 const UserNotFoundError = require("../src/errors/AppError");
+const {
+  recordFailedAttempt,
+  resetAttempts,
+} = require("../src/infrastructure/middleware/BruteForceMiddleware");
 
 describe("LoginUseCase - Nova Arquitetura", () => {
   let mockUserUseCases;
@@ -96,5 +100,18 @@ describe("LoginUseCase - Nova Arquitetura", () => {
     await expect(
       loginUseCase.execute("joao@email.com", "SenhaErrada123!"),
     ).rejects.toThrow();
+  });
+
+  test("deve retornar UserBlockedError, e não erro interno, para conta bloqueada", async () => {
+    const email = "bloqueado@example.com";
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      recordFailedAttempt(email);
+    }
+
+    await expect(loginUseCase.execute(email, "Senha123!")).rejects.toMatchObject({
+      statusCode: 401,
+      errorCode: "USER_BLOCKED",
+    });
+    resetAttempts(email);
   });
 });

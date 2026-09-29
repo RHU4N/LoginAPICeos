@@ -20,7 +20,13 @@ class HistoricoController {
       const userId = req.userId;
       const { tipo, valores, resultado } = req.body;
 
-      if (!tipo || !valores || !resultado) {
+      if (
+        !tipo ||
+        valores === undefined ||
+        valores === null ||
+        resultado === undefined ||
+        resultado === null
+      ) {
         throw new ValidationError("tipo, valores e resultado são obrigatórios");
       }
 
