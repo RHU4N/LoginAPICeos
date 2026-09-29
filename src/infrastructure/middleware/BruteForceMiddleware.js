@@ -100,8 +100,10 @@ class BruteForceStore {
 // Instância global
 const bruteForceStore = new BruteForceStore();
 
-// Limpar a cada 5 minutos
-setInterval(() => bruteForceStore.cleanup(), 5 * 60 * 1000);
+// Limpar a cada 5 minutos. O timer não deve manter um processo HTTP/teste vivo
+// sozinho quando não há mais trabalho pendente.
+const cleanupInterval = setInterval(() => bruteForceStore.cleanup(), 5 * 60 * 1000);
+cleanupInterval.unref();
 
 /**
  * Middleware para verificar brute force

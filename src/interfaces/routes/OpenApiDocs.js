@@ -19,6 +19,35 @@
  *             code: { type: string, example: VALIDATION_ERROR }
  *             message: { type: string, example: Dados inválidos. }
  *             statusCode: { type: integer, example: 400 }
+ *     RespostaSucesso:
+ *       type: object
+ *       required: [success, message, data]
+ *       properties:
+ *         success: { type: boolean, example: true }
+ *         message: { type: string, example: Operação realizada com sucesso }
+ *         data:
+ *           nullable: true
+ *           description: Objeto, array, valor ou null retornado pela operação.
+ *     UsuarioPublico:
+ *       type: object
+ *       properties:
+ *         id: { type: string, example: 66d0a0000000000000000001 }
+ *         nome: { type: string, example: Ana Silva }
+ *         email: { type: string, format: email, example: ana@example.com }
+ *         telefone: { type: string, example: '11999999999' }
+ *         assinante: { type: boolean, example: false }
+ *         ativo: { type: boolean, example: true }
+ *     LoginResposta:
+ *       allOf:
+ *         - $ref: '#/components/schemas/RespostaSucesso'
+ *         - type: object
+ *           properties:
+ *             message: { example: Login realizado com sucesso }
+ *             data:
+ *               type: object
+ *               properties:
+ *                 user: { $ref: '#/components/schemas/UsuarioPublico' }
+ *                 expiresIn: { type: string, example: 15m }
  *     HistoricoEntrada:
  *       type: object
  *       required: [tipo, valores, resultado]
@@ -75,22 +104,42 @@
  *             type: object
  *             required: [email, senha]
  *             properties: { email: { type: string, format: email }, senha: { type: string, format: password } }
- *     responses: { '200': { description: Sessão criada }, '400': { description: Dados inválidos }, '401': { description: Credenciais inválidas } }
+ *     responses:
+ *       '200':
+ *         description: Sessão criada; os tokens são gravados em cookies HttpOnly.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/LoginResposta' }
+ *       '400': { $ref: '#/components/responses/BadRequest' }
+ *       '401': { $ref: '#/components/responses/Unauthorized' }
  * /auth/logout:
  *   post:
  *     tags: [Autenticação]
  *     summary: Encerra a sessão atual
- *     responses: { '200': { description: Sessão encerrada }, '401': { description: Não autenticado } }
+ *     responses:
+ *       '200':
+ *         description: Sessão encerrada
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/RespostaSucesso' }, example: { success: true, message: Logout realizado com sucesso, data: null } } }
+ *       '401': { $ref: '#/components/responses/Unauthorized' }
  * /auth/refresh:
  *   post:
  *     tags: [Autenticação]
  *     summary: Renova o access token com o cookie refreshToken
- *     responses: { '200': { description: Sessão renovada }, '400': { description: Refresh token ausente }, '401': { description: Refresh token inválido } }
+ *     responses:
+ *       '200':
+ *         description: Sessão renovada
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/RespostaSucesso' }, example: { success: true, message: Sessão renovada com sucesso, data: { expiresIn: 15m } } } }
+ *       '400': { $ref: '#/components/responses/BadRequest' }
+ *       '401': { $ref: '#/components/responses/Unauthorized' }
  * /auth/me:
  *   get:
  *     tags: [Autenticação]
  *     summary: Retorna o usuário autenticado
- *     responses: { '200': { description: Usuário atual }, '401': { description: Não autenticado } }
+ *     responses:
+ *       '200':
+ *         description: Usuário atual, sem senha, hash ou dados internos
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/RespostaSucesso' } } }
+ *       '401': { $ref: '#/components/responses/Unauthorized' }
  * /auth/change-password:
  *   post:
  *     tags: [Autenticação]
@@ -113,6 +162,10 @@
  *     tags: [Usuários]
  *     security: []
  *     summary: Cria uma conta
+ *     responses:
+ *       '201':
+ *         description: Conta criada
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/RespostaSucesso' }, example: { success: true, message: Usuário cadastrado com sucesso, data: { id: 66d0a0000000000000000001, nome: Ana Silva, email: ana@example.com } } } }
  *   get:
  *     tags: [Usuários]
  *     summary: Lista usuários (somente administrador)
@@ -141,6 +194,10 @@
  *   get:
  *     tags: [Histórico]
  *     summary: Lista o histórico do usuário autenticado
+ *     responses:
+ *       '200':
+ *         description: Registros retornados em data
+ *         content: { application/json: { schema: { $ref: '#/components/schemas/RespostaSucesso' }, example: { success: true, message: Histórico consultado com sucesso, data: [] } } }
  *   delete:
  *     tags: [Histórico]
  *     summary: Limpa o histórico; requer confirmed=true

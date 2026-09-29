@@ -63,29 +63,27 @@ if (environment.isDevelopment()) {
 
 // Health check
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    data: {
+  return successResponse(
+    res,
+    {
       status: "OK",
       environment: environment.NODE_ENV,
       database: "connected",
       timestamp: new Date().toISOString(),
     },
-  });
+    "API em funcionamento",
+  );
 });
 
 // Raiz
 app.get("/", (req, res) => {
-  res.json({
-    message: "LoginAPICeos - API de Autenticação",
+  return successResponse(res, {
+    service: "LoginAPICeos - API de Autenticação",
     status: "Estou aqui",
     version: "2.0.0",
     environment: environment.NODE_ENV,
-  });
+  }, "API disponível");
 });
-
-// Rotas de teste
-app.get('/', (req, res) => successResponse(res, null, 'API disponível'));
 // ============================================================================
 // ROTAS
 // ============================================================================
