@@ -102,7 +102,7 @@ const authConfig = {
     origin: environment.CORS_ORIGIN,
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client"],
   },
 };
 

@@ -25,23 +25,37 @@ class AuthController {
       new LoginDTO(email, senha).validate();
 
       const result = await this.loginUseCase.execute(email, senha);
-      res.cookie(
-        authConfig.cookies.accessToken.name,
-        result.accessToken,
-        authConfig.cookies.accessToken,
-      );
-      res.cookie(
-        authConfig.cookies.refreshToken.name,
-        result.refreshToken,
-        authConfig.cookies.refreshToken,
-      );
+      const isMobileClient = typeof req.get === "function"
+        && req.get("X-CEOS-Client") === "mobile";
+
+      // O navegador continua usando cookies HttpOnly. Em React Native não há um
+      // cookie jar confiável para esse fluxo, então o app identificado recebe
+      // os tokens para armazená-los no SecureStore e enviá-los como Bearer.
+      if (!isMobileClient) {
+        res.cookie(
+          authConfig.cookies.accessToken.name,
+          result.accessToken,
+          authConfig.cookies.accessToken,
+        );
+        res.cookie(
+          authConfig.cookies.refreshToken.name,
+          result.refreshToken,
+          authConfig.cookies.refreshToken,
+        );
+      }
+
+      const data = {
+        user: new LoginResponseDTO(result.user).user,
+        expiresIn: "15m",
+      };
+      if (isMobileClient) {
+        data.accessToken = result.accessToken;
+        data.refreshToken = result.refreshToken;
+      }
 
       return successResponse(
         res,
-        {
-          user: new LoginResponseDTO(result.user).user,
-          expiresIn: "15m",
-        },
+        data,
         "Login realizado com sucesso",
       );
     } catch (error) {
@@ -61,19 +75,29 @@ class AuthController {
       }
 
       const result = await this.refreshTokenUseCase.execute(refreshToken);
-      res.cookie(
-        authConfig.cookies.accessToken.name,
-        result.accessToken,
-        authConfig.cookies.accessToken,
-      );
-      res.cookie(
-        authConfig.cookies.refreshToken.name,
-        result.refreshToken,
-        authConfig.cookies.refreshToken,
-      );
+      const isMobileClient = typeof req.get === "function"
+        && req.get("X-CEOS-Client") === "mobile";
+      if (!isMobileClient) {
+        res.cookie(
+          authConfig.cookies.accessToken.name,
+          result.accessToken,
+          authConfig.cookies.accessToken,
+        );
+        res.cookie(
+          authConfig.cookies.refreshToken.name,
+          result.refreshToken,
+          authConfig.cookies.refreshToken,
+        );
+      }
       return successResponse(
         res,
-        { expiresIn: result.expiresIn },
+        isMobileClient
+          ? {
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            expiresIn: result.expiresIn,
+          }
+          : { expiresIn: result.expiresIn },
         "Sessão renovada com sucesso",
       );
     } catch (error) {
