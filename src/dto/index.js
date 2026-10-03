@@ -5,6 +5,9 @@
 
 const { ValidationError } = require("../errors/AppError");
 
+// Importar validação de formula para funções personalizadas
+const FormulaValidator = require("../../src/application/validators/FormulaValidator");
+
 // ============================================================================
 // AUTH DTOs
 // ============================================================================
@@ -245,7 +248,8 @@ class CreateCustomFunctionDTO {
       throw new ValidationError("Categoria inválida");
     }
     if (!this.tipo) throw new ValidationError("Tipo é obrigatório");
-    if (!this.formula) throw new ValidationError("Fórmula é obrigatória");
+    
+    FormulaValidator.validate(this.formula, this.parametros);
   }
 }
 
