@@ -15,7 +15,7 @@ class FormulaValidator {
         this.validateCharacters(formulaLimpa);
         this.validateParentheses(formulaLimpa);
         this.validateVariables(formulaLimpa, parametros);
-        this.validateOperators(formulaLimpa);
+        this.validateSyntax(formulaLimpa);
 
         return true;
     }
@@ -73,16 +73,33 @@ class FormulaValidator {
     }
 
 
-    static validateOperators(formula) {
-    const formulaSemEspacos = formula.replace(/\s+/g, "");
-    const operadoresConsecutivos = /[+\-*/]{2,}/;
+    static validateSyntax(formula) {
+        const tokens = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*|\d+(?:\.\d+)?|[+\-*/()]/g) || [];
+        let expectsOperand = true;
 
-    if (operadoresConsecutivos.test(formulaSemEspacos)) {
-        throw new ValidationError(
-            "Fórmula contém operadores consecutivos inválidos"
-        );
+        for (const token of tokens) {
+            const isOperand = /^[a-zA-Z_]|^\d/.test(token);
+
+            if (isOperand) {
+                if (!expectsOperand) throw new ValidationError("Fórmula contém operandos sem operador");
+                expectsOperand = false;
+            } else if (token === "(") {
+                if (!expectsOperand) throw new ValidationError("Fórmula contém operandos sem operador");
+                expectsOperand = true;
+            } else if (token === ")") {
+                if (expectsOperand) throw new ValidationError("Fórmula contém parênteses vazios ou operador inválido");
+                expectsOperand = false;
+            } else if (expectsOperand) {
+                if (token !== "+" && token !== "-") {
+                    throw new ValidationError("Fórmula contém operador inválido");
+                }
+            } else {
+                expectsOperand = true;
+            }
+        }
+
+        if (expectsOperand) throw new ValidationError("Fórmula não pode terminar com operador");
     }
-}
 }
 
 module.exports = FormulaValidator;
