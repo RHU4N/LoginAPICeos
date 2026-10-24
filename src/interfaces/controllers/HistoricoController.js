@@ -4,6 +4,7 @@
 
 const { ValidationError } = require("../../errors/AppError");
 const UserRepositoryImpl = require("../../infrastructure/repositories/UserRepositoryImpl");
+const { HistoricoResponseDTO } = require("../../dto");
 const successResponse = require("../responses/successResponse");
 
 class HistoricoController {
@@ -36,7 +37,7 @@ class HistoricoController {
         resultado,
       });
 
-      return successResponse(res, historico, "Histórico adicionado com sucesso", 201);
+      return successResponse(res, new HistoricoResponseDTO(historico), "Histórico adicionado com sucesso", 201);
     } catch (error) {
       return next(error);
     }
@@ -60,7 +61,7 @@ class HistoricoController {
 
       return successResponse(
         res,
-        paginados,
+        paginados.map((historico) => new HistoricoResponseDTO(historico)),
         "Histórico consultado com sucesso",
         200,
         {
@@ -97,7 +98,7 @@ class HistoricoController {
 
       return successResponse(
         res,
-        historicos,
+        historicos.map((historico) => new HistoricoResponseDTO(historico)),
         "Item do histórico removido com sucesso",
       );
     } catch (error) {

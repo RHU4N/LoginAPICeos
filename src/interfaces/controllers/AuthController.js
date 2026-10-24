@@ -12,6 +12,11 @@ const {
 const authConfig = require("../../config/auth");
 const { AppError } = require("../../errors/AppError");
 
+function isMobileClient(req) {
+  const header = req.get?.("X-CEOS-Client") || req.headers?.["x-ceos-client"];
+  return String(header || "").toLowerCase() === "mobile";
+}
+
 class AuthController {
   constructor(loginUseCase, refreshTokenUseCase, changePasswordUseCase) {
     this.loginUseCase = loginUseCase;
@@ -25,23 +30,33 @@ class AuthController {
       new LoginDTO(email, senha).validate();
 
       const result = await this.loginUseCase.execute(email, senha);
-      res.cookie(
-        authConfig.cookies.accessToken.name,
-        result.accessToken,
-        authConfig.cookies.accessToken,
-      );
-      res.cookie(
-        authConfig.cookies.refreshToken.name,
-        result.refreshToken,
-        authConfig.cookies.refreshToken,
-      );
+      const mobile = isMobileClient(req);
+
+      if (!mobile) {
+        res.cookie(
+          authConfig.cookies.accessToken.name,
+          result.accessToken,
+          authConfig.cookies.accessToken,
+        );
+        res.cookie(
+          authConfig.cookies.refreshToken.name,
+          result.refreshToken,
+          authConfig.cookies.refreshToken,
+        );
+      }
+
+      const data = {
+        user: new LoginResponseDTO(result.user).user,
+        expiresIn: "15m",
+      };
+      if (mobile) {
+        data.accessToken = result.accessToken;
+        data.refreshToken = result.refreshToken;
+      }
 
       return successResponse(
         res,
-        {
-          user: new LoginResponseDTO(result.user).user,
-          expiresIn: "15m",
-        },
+        data,
         "Login realizado com sucesso",
       );
     } catch (error) {
@@ -61,19 +76,29 @@ class AuthController {
       }
 
       const result = await this.refreshTokenUseCase.execute(refreshToken);
-      res.cookie(
-        authConfig.cookies.accessToken.name,
-        result.accessToken,
-        authConfig.cookies.accessToken,
-      );
-      res.cookie(
-        authConfig.cookies.refreshToken.name,
-        result.refreshToken,
-        authConfig.cookies.refreshToken,
-      );
+      const mobile = isMobileClient(req);
+
+      if (!mobile) {
+        res.cookie(
+          authConfig.cookies.accessToken.name,
+          result.accessToken,
+          authConfig.cookies.accessToken,
+        );
+        res.cookie(
+          authConfig.cookies.refreshToken.name,
+          result.refreshToken,
+          authConfig.cookies.refreshToken,
+        );
+      }
+
+      const data = { expiresIn: result.expiresIn };
+      if (mobile) {
+        data.accessToken = result.accessToken;
+        data.refreshToken = result.refreshToken;
+      }
       return successResponse(
         res,
-        { expiresIn: result.expiresIn },
+        data,
         "Sessão renovada com sucesso",
       );
     } catch (error) {

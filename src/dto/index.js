@@ -173,7 +173,7 @@ class AddHistoricoDTO {
 
 class HistoricoResponseDTO {
   constructor(historico) {
-    this.id = historico._id;
+    this.id = historico.id || historico._id?.toString?.() || historico._id;
     this.tipo = historico.tipo;
     this.valores = historico.valores;
     this.resultado = historico.resultado;
