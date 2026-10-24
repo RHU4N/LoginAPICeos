@@ -1,4 +1,4 @@
-const environment = require("../../config/environment");
+const authConfig = require("../../config/auth");
 
 const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -8,10 +8,7 @@ function csrfMiddleware(req, res, next) {
   const hasSessionCookie = req.cookies?.accessToken || req.cookies?.refreshToken;
   if (!unsafeMethods.has(req.method) || !hasSessionCookie) return next();
 
-  const allowedOrigins = [environment.CORS_ORIGIN];
-  if (environment.isDevelopment()) allowedOrigins.push(`http://localhost:${environment.PORT}`);
-
-  if (!req.headers.origin || !allowedOrigins.includes(req.headers.origin)) {
+  if (!req.headers.origin || !authConfig.isCorsOriginAllowed(req.headers.origin)) {
     return res.status(403).json({
       success: false,
       error: { code: "CSRF_ORIGIN_DENIED", message: "Origem da requisição não permitida" },

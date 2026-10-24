@@ -60,6 +60,12 @@ describe("respostas dos controllers", () => {
     expect(res.cookies).toHaveLength(2);
   });
 
+  test("CORS aceita as origens locais usadas pelo frontend em desenvolvimento", () => {
+    expect(authConfig.isCorsOriginAllowed("http://localhost:3000")).toBe(true);
+    expect(authConfig.isCorsOriginAllowed("http://127.0.0.1:3001")).toBe(true);
+    expect(authConfig.isCorsOriginAllowed("https://origem-nao-confiavel.example")).toBe(false);
+  });
+
   test("login mobile retorna o par de tokens sem alterar o fluxo por cookie do web", async () => {
     const loginUseCase = {
       execute: jest.fn().mockResolvedValue({

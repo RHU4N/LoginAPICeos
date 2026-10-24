@@ -4,6 +4,22 @@
 
 const environment = require("./environment");
 
+const developmentWebOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+];
+
+const allowedCorsOrigins = [
+  environment.CORS_ORIGIN,
+  ...(!environment.isProduction() ? developmentWebOrigins : []),
+];
+
+function isCorsOriginAllowed(origin) {
+  return !origin || allowedCorsOrigins.includes(origin);
+}
+
 const authConfig = {
   /**
    * Configurações de JWT
@@ -99,11 +115,14 @@ const authConfig = {
    * CORS
    */
   cors: {
-    origin: environment.CORS_ORIGIN,
+    origin: (origin, callback) => callback(null, isCorsOriginAllowed(origin)),
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client"],
   },
+
+  allowedCorsOrigins,
+  isCorsOriginAllowed,
 };
 
 module.exports = authConfig;
