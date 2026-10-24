@@ -1,6 +1,7 @@
 const AuthController = require("../src/interfaces/controllers/AuthController");
 const UserController = require("../src/interfaces/controllers/UserController");
 const HistoricoController = require("../src/interfaces/controllers/HistoricoController");
+const authConfig = require("../src/config/auth");
 
 function responseDouble() {
   return {
@@ -27,6 +28,10 @@ const user = {
 };
 
 describe("respostas dos controllers", () => {
+  test("CORS permite o cabeçalho de transporte do cliente mobile", () => {
+    expect(authConfig.cors.allowedHeaders).toContain("X-CEOS-Client");
+  });
+
   test("login retorna o usuário público no contrato esperado pelo frontend", async () => {
     const loginUseCase = {
       execute: jest.fn().mockResolvedValue({
@@ -50,7 +55,34 @@ describe("respostas dos controllers", () => {
     });
     expect(res.body.data.user).not.toHaveProperty("senhaHash");
     expect(res.body.data.user).not.toHaveProperty("tokenVersion");
+    expect(res.body.data).not.toHaveProperty("accessToken");
+    expect(res.body.data).not.toHaveProperty("refreshToken");
     expect(res.cookies).toHaveLength(2);
+  });
+
+  test("login mobile retorna o par de tokens sem alterar o fluxo por cookie do web", async () => {
+    const loginUseCase = {
+      execute: jest.fn().mockResolvedValue({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        user,
+      }),
+    };
+    const controller = new AuthController(loginUseCase, {}, {});
+    const res = responseDouble();
+
+    await controller.login(
+      { body: { email: user.email, senha: "Senha123!" }, headers: { "x-ceos-client": "mobile" } },
+      res,
+      jest.fn(),
+    );
+
+    expect(res.body.data).toMatchObject({
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      user: { id: "u1", email: user.email },
+    });
+    expect(res.cookies).toHaveLength(0);
   });
 
   test("refresh, logout, alteração de senha e /me mantêm o contrato de sucesso", async () => {
@@ -80,6 +112,19 @@ describe("respostas dos controllers", () => {
       data: { expiresIn: "15m" },
     });
     expect(refresh.cookies).toHaveLength(2);
+
+    const mobileRefresh = responseDouble();
+    await controller.refresh(
+      { cookies: {}, body: { refreshToken: "refresh-token" }, headers: { "x-ceos-client": "mobile" } },
+      mobileRefresh,
+      next,
+    );
+    expect(mobileRefresh.body.data).toMatchObject({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
+      expiresIn: "15m",
+    });
+    expect(mobileRefresh.cookies).toHaveLength(0);
 
     const me = responseDouble();
     await controller.getMe({ userId: "u1" }, me, next);
@@ -156,11 +201,11 @@ describe("respostas dos controllers", () => {
     const add = responseDouble();
     await controller.add({ userId: "u1", body: { tipo: "soma", valores: "1,2", resultado: 3 } }, add, next);
     expect(add.statusCode).toBe(201);
-    expect(add.body.data).toEqual(historico);
+    expect(add.body.data).toEqual({ id: "h1", tipo: "soma", valores: "1,2", resultado: 3, criadoEm: undefined });
 
     const list = responseDouble();
     await controller.list({ userId: "u1", query: {} }, list, next);
-    expect(list.body.data).toEqual([historico]);
+    expect(list.body.data).toEqual([{ id: "h1", tipo: "soma", valores: "1,2", resultado: 3, criadoEm: undefined }]);
     expect(list.body.pagination).toMatchObject({ total: 1 });
 
     const deletion = responseDouble();

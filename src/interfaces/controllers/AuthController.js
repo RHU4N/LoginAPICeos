@@ -12,6 +12,11 @@ const {
 const authConfig = require("../../config/auth");
 const { AppError } = require("../../errors/AppError");
 
+function isMobileClient(req) {
+  const header = req.get?.("X-CEOS-Client") || req.headers?.["x-ceos-client"];
+  return String(header || "").toLowerCase() === "mobile";
+}
+
 class AuthController {
   constructor(loginUseCase, refreshTokenUseCase, changePasswordUseCase) {
     this.loginUseCase = loginUseCase;
@@ -25,13 +30,9 @@ class AuthController {
       new LoginDTO(email, senha).validate();
 
       const result = await this.loginUseCase.execute(email, senha);
-      const isMobileClient = typeof req.get === "function"
-        && req.get("X-CEOS-Client") === "mobile";
+      const mobile = isMobileClient(req);
 
-      // O navegador continua usando cookies HttpOnly. Em React Native não há um
-      // cookie jar confiável para esse fluxo, então o app identificado recebe
-      // os tokens para armazená-los no SecureStore e enviá-los como Bearer.
-      if (!isMobileClient) {
+      if (!mobile) {
         res.cookie(
           authConfig.cookies.accessToken.name,
           result.accessToken,
@@ -48,7 +49,7 @@ class AuthController {
         user: new LoginResponseDTO(result.user).user,
         expiresIn: "15m",
       };
-      if (isMobileClient) {
+      if (mobile) {
         data.accessToken = result.accessToken;
         data.refreshToken = result.refreshToken;
       }
@@ -75,9 +76,9 @@ class AuthController {
       }
 
       const result = await this.refreshTokenUseCase.execute(refreshToken);
-      const isMobileClient = typeof req.get === "function"
-        && req.get("X-CEOS-Client") === "mobile";
-      if (!isMobileClient) {
+      const mobile = isMobileClient(req);
+
+      if (!mobile) {
         res.cookie(
           authConfig.cookies.accessToken.name,
           result.accessToken,
@@ -89,15 +90,15 @@ class AuthController {
           authConfig.cookies.refreshToken,
         );
       }
+
+      const data = { expiresIn: result.expiresIn };
+      if (mobile) {
+        data.accessToken = result.accessToken;
+        data.refreshToken = result.refreshToken;
+      }
       return successResponse(
         res,
-        isMobileClient
-          ? {
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-            expiresIn: result.expiresIn,
-          }
-          : { expiresIn: result.expiresIn },
+        data,
         "Sessão renovada com sucesso",
       );
     } catch (error) {

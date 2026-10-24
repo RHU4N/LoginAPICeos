@@ -250,9 +250,14 @@ Medições de sensores IoT com índices otimizados para time-series
 }
 ```
 
-Os tokens JWT são enviados exclusivamente em cookies `HttpOnly` (`accessToken`
-e `refreshToken`); eles não aparecem no corpo da resposta nem são guardados
-no `localStorage`.
+No cliente Web, os tokens JWT são enviados exclusivamente em cookies `HttpOnly`
+(`accessToken` e `refreshToken`); eles não aparecem no corpo da resposta nem
+são guardados no `localStorage`.
+
+O aplicativo nativo deve enviar `X-CEOS-Client: mobile`. Após validar as mesmas
+credenciais, a API retorna `accessToken` e `refreshToken` no corpo JSON, sem
+criar cookies. Esse cabeçalho apenas escolhe o meio de transporte da sessão; não
+concede autorização nem substitui a validação das credenciais e dos JWTs.
 
 **`POST /auth/refresh`** - Renovar Token
 
@@ -261,6 +266,9 @@ no `localStorage`.
   "refreshToken": "eyJhbGc..."
 }
 ```
+
+Para o fluxo mobile, envie o mesmo cabeçalho `X-CEOS-Client: mobile`; a resposta
+também contém o novo par `accessToken` e `refreshToken`.
 
 **`POST /auth/change-password`** (🔒 Autenticado)
 
