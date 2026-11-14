@@ -5,7 +5,9 @@
   "scripts": {
     "test": "jest --runInBand",
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "lint": "node scripts/check-js.cjs",
+    "test:integration": "node --test tests/integration/iot.integration.cjs"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
+    "mongodb-memory-server": "^11.3.0",
     "supertest": "^6.3.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.6.3"

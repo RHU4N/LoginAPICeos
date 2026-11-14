@@ -1,0 +1,25 @@
+name: CI - Persistência IoT
+on:
+  push:
+    branches: [master, 'feat/SCRUM-75-*']
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  iot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: test
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.cache/mongodb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test -- --silent
+      - run: npm run test:integration

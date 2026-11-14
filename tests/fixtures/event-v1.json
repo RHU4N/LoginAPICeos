@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "eventId": "f6738958-06cd-4a89-823a-af0d99501af2",
+  "deviceId": "wokwi-esp32-001",
+  "receivedAt": "2026-11-14T10:00:00.000Z",
+  "measurements": [
+    {
+      "sensorId": "dht22-temperatura",
+      "physicalSensorId": "dht22",
+      "sensorTipo": "temperatura",
+      "valor": 24.5,
+      "unidade": "C",
+      "timestamp": "2026-11-14T10:00:00.000Z",
+      "timestampOrigin": "receivedAt",
+      "idempotencyKey": "f6738958-06cd-4a89-823a-af0d99501af2:dht22-temperatura"
+    },
+    {
+      "sensorId": "dht22-umidade",
+      "physicalSensorId": "dht22",
+      "sensorTipo": "umidade",
+      "valor": 61.2,
+      "unidade": "%",
+      "timestamp": "2026-11-14T10:00:00.000Z",
+      "timestampOrigin": "receivedAt",
+      "idempotencyKey": "f6738958-06cd-4a89-823a-af0d99501af2:dht22-umidade"
+    },
+    {
+      "sensorId": "bmp180-temperatura",
+      "physicalSensorId": "bmp180",
+      "sensorTipo": "temperatura",
+      "valor": 25.3,
+      "unidade": "C",
+      "timestamp": "2026-11-14T10:00:00.000Z",
+      "timestampOrigin": "receivedAt",
+      "idempotencyKey": "f6738958-06cd-4a89-823a-af0d99501af2:bmp180-temperatura"
+    },
+    {
+      "sensorId": "bmp180-pressao",
+      "physicalSensorId": "bmp180",
+      "sensorTipo": "pressao",
+      "valor": 1013.8,
+      "unidade": "hPa",
+      "timestamp": "2026-11-14T10:00:00.000Z",
+      "timestampOrigin": "receivedAt",
+      "idempotencyKey": "f6738958-06cd-4a89-823a-af0d99501af2:bmp180-pressao"
+    }
+  ]
+}
