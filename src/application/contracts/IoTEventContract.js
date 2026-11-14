@@ -24,6 +24,7 @@ function validDate(value) {
 }
 function validateEvent(event) {
   requireValid(event && typeof event === 'object' && !Array.isArray(event), 'Evento deve ser objeto.');
+  if (event.schemaVersion === 2) return validateV2(event);
   requireValid(event.schemaVersion === 1, 'schemaVersion não suportada.');
   requireValid(typeof event.eventId === 'string' && UUID.test(event.eventId), 'eventId deve ser UUID.');
   requireValid(typeof event.deviceId === 'string' && DEVICE.test(event.deviceId), 'deviceId inválido.');
@@ -49,6 +50,23 @@ function validateEvent(event) {
     // A chave antiga é preservada para mensagens produzidas antes da migração.
     requireValid(measurement.idempotencyKey === event.eventId + ':' + sensorId ||
       measurement.idempotencyKey === event.eventId + ':' + field, 'idempotencyKey incompatível.');
+  }
+  return event;
+}
+function validateV2(event) {
+  requireValid(UUID.test(event.eventId || '') && DEVICE.test(event.deviceId || ''), 'Identificadores inválidos.');
+  requireValid(validDate(event.receivedAt) && event.userId === undefined, 'Recebimento ou proprietário inválido.');
+  requireValid(Number.isInteger(event.credentialVersion) && event.credentialVersion > 0, 'Vínculo inválido.');
+  requireValid(event.requestId === undefined || UUID.test(event.requestId), 'requestId inválido.');
+  requireValid(Array.isArray(event.measurements) && event.measurements.length > 0 && event.measurements.length <= 32, 'Quantidade de sensores inválida.');
+  const seen = new Set();
+  for (const m of event.measurements) {
+    requireValid(m && DEVICE.test(m.sensorId || '') && !seen.has(m.sensorId), 'Sensor inválido ou duplicado.');
+    seen.add(m.sensorId);
+    requireValid(DEVICE.test(m.sensorTipo || '') && typeof m.unidade === 'string' && m.unidade.length > 0 && m.unidade.length <= 24, 'Tipo ou unidade inválido.');
+    requireValid(typeof m.valor === 'number' && Number.isFinite(m.valor) && validDate(m.timestamp), 'Valor ou data inválido.');
+    requireValid(['receivedAt', 'collectedAt'].includes(m.timestampOrigin) && m.userId === undefined, 'Origem inválida.');
+    requireValid(m.idempotencyKey === `${event.eventId}:${m.sensorId}`, 'Chave inválida.');
   }
   return event;
 }
