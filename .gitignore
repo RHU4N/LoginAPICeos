@@ -1,5 +1,7 @@
 # Dependencies and generated files
 node_modules/
+.npm/
+.cache/
 coverage/
 
 # Local environment files: keep the committed template only

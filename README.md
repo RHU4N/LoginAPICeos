@@ -523,3 +523,8 @@ Favoritos, funções personalizadas e medições IoT possuem collections, índic
 DTOs, persistência e endpoints próprios. O diagnóstico da estrutura antiga, os
 ambientes, relacionamentos e índices estão documentados em
 [docs/DATABASE.md](docs/DATABASE.md).
+# Integração IoT assíncrona
+
+A mensageria usa Azure Queue Storage e o endpoint autenticado
+`POST /iot/internal/measurements`. Configuração, contrato, testes de persistência,
+segurança e operação estão em [docs/IOT-MESSAGING.md](docs/IOT-MESSAGING.md).

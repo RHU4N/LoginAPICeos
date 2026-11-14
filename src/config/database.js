@@ -25,11 +25,9 @@ async function connectDatabase() {
     }
 
     // Log de conexão (sem exposição de credenciais)
-    const dbLog = mongoUri.replace(/([^:]+):([^@]+)@/, "***:***@");
     console.log(`🔌 Conectando ao MongoDB...`);
     console.log(`   Ambiente: ${environment.NODE_ENV}`);
     console.log(`   Database: ${dbName}`);
-    console.log(`   URI: ${dbLog}`);
 
     // Conectar
     await mongoose.connect(mongoUri, {
