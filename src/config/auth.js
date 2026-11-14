@@ -118,7 +118,7 @@ const authConfig = {
     origin: (origin, callback) => callback(null, isCorsOriginAllowed(origin)),
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client", "Idempotency-Key"],
   },
 
   allowedCorsOrigins,

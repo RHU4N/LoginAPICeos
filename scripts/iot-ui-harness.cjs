@@ -11,7 +11,7 @@ process.env.CEOS_IOT_COMMANDS_ENABLED = "true";
 const cache = path.resolve(__dirname, "../.cache");
 fs.mkdirSync(cache, { recursive: true });
 async function run() {
-  const mongo = await MongoMemoryServer.create();
+  const mongo = await MongoMemoryServer.create({ instance: { launchTimeout: 90000 } });
   process.env.MONGO_URI = mongo.getUri();
   await mongoose.connect(process.env.MONGO_URI);
   const app = require("../index");

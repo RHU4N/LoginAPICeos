@@ -18,7 +18,7 @@ const fresh = () => {
 const post = (value) => request(app).post('/iot/internal/measurements').set('x-ceos-service-key', process.env.CEOS_SERVICE_KEY).send(value);
 
 before(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await MongoMemoryServer.create({ instance: { launchTimeout: 90000 } });
   process.env.MONGO_URI = mongo.getUri();
   process.env.MONGODB_DATABASE = 'ceos_test_iot_' + randomBytes(6).toString('hex');
   await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.MONGODB_DATABASE });

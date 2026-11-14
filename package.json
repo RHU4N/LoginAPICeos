@@ -7,7 +7,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "lint": "node scripts/check-js.cjs",
-    "test:integration": "node --test tests/integration/iot.integration.cjs tests/integration/iot-platform.integration.cjs"
+    "test:integration": "node --test tests/integration/iot.integration.cjs tests/integration/iot-platform.integration.cjs tests/integration/iot-cors.integration.cjs"
   },
   "keywords": [],
   "author": "",
