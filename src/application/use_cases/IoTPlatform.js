@@ -764,13 +764,18 @@ class IoTPlatform {
     })
       .sort({ createdAt: -1 })
       .limit(100);
-    // Read-only legacy inventory; registration/ownership is never inferred from client input.
+    // Historical inventory is derived only from this user's measurements, including unlinked devices.
     const legacyIds = await Measurement.distinct("deviceId", { userId });
     for (const deviceId of legacyIds)
-      if (
-        !devices.some((d) => d.deviceId === deviceId) &&
-        !(await Device.exists({ deviceId }))
-      ) {
+      if (!devices.some((d) => d.deviceId === deviceId)) {
+        const archived = await Device.findOne({ deviceId }).select(
+          "ownerId nome",
+        );
+        const historyOnly = Boolean(archived);
+        const name =
+          archived && String(archived.ownerId) === String(userId)
+            ? archived.nome
+            : deviceId;
         const latest = await Measurement.findOne({ userId, deviceId }).sort({
           timestamp: -1,
         });
@@ -786,11 +791,12 @@ class IoTPlatform {
         ]);
         devices.push({
           deviceId,
-          nome: deviceId,
-          status: "LEGACY",
+          nome: historyOnly ? `${name} (histórico)` : deviceId,
+          status: historyOnly ? "ARCHIVED" : "LEGACY",
           legacy: true,
+          historyOnly,
           ultimoContato: latest.criadoEm,
-          capacidades: { supportsPush: true },
+          capacidades: { supportsPush: !historyOnly },
           sensores: sensors.map((s) => ({
             sensorId: s._id,
             nome: s._id,

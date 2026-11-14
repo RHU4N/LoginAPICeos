@@ -378,3 +378,43 @@ test("legacy migration authorizes only the configured owner and never rewrites m
   assert.equal(result.body.data.length, 4);
   assert.ok(result.body.data.every((m) => m.userId === String(userId)));
 });
+
+test("unlink preserves owner history in device inventory without restoring access", async () => {
+  await models.Rate.deleteMany({});
+  const d = await setup({ nome: "Archived station" });
+  const input = {
+    deviceId: d.deviceId,
+    eventId: randomUUID(),
+    measurements: [
+      { sensorId: "temp", valor: 22 },
+      { sensorId: "humid", valor: 55 },
+    ],
+  };
+  const event = (
+    await internal("prepare", {
+      event: input,
+      deviceToken: d.deviceToken,
+    }).expect(200)
+  ).body.data;
+  await internal("measurements", event).expect(200);
+  await api("post", "/iot/devices/" + d.deviceId + "/unlink", {}).expect(200);
+  const inventory = (await api("get", "/iot/devices").expect(200)).body.data;
+  const archived = inventory.find((item) => item.deviceId === d.deviceId);
+  assert.equal(archived.historyOnly, true);
+  assert.equal(archived.status, "ARCHIVED");
+  assert.equal(archived.capacidades.supportsPush, false);
+  assert.match(archived.nome, /Archived station/);
+  const values = await api(
+    "get",
+    "/iot/devices/" + d.deviceId + "/dashboard",
+  ).expect(200);
+  assert.equal(values.body.data.length, 2);
+  await api(
+    "get",
+    "/iot/devices/" + d.deviceId + "/dashboard",
+    undefined,
+    otherToken,
+  ).expect(404);
+  await deviceApi(d, "get", "commands").expect(401);
+  await createRequest(d).expect(409);
+});
