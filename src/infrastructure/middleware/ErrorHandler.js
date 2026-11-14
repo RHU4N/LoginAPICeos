@@ -9,6 +9,14 @@ const environment = require("../../config/environment");
  * Middleware de tratamento de erro global
  */
 function errorHandler(err, req, res, next) {
+  if (req.originalUrl?.startsWith('/iot/internal/')) {
+    // Nem erros de parser (que carregam body), nem erros do driver entram nos logs.
+    const invalidJson = err instanceof SyntaxError && err.status === 400 && 'body' in err;
+    const status = err instanceof AppError ? err.statusCode : invalidJson ? 400 : 503;
+    const code = err instanceof AppError ? err.errorCode : invalidJson ? 'INVALID_JSON' : 'IOT_STORAGE_UNAVAILABLE';
+    console.error(JSON.stringify({ etapa: 'ingestao', resultado: 'falha', tipoErro: code, status }));
+    return res.status(status).json({ success: false, error: { code, message: err instanceof AppError ? err.message : invalidJson ? 'JSON inválido.' : 'Persistência IoT indisponível.', statusCode: status } });
+  }
   // Log do erro (sem expor detalhes em produção)
   if (environment.isDevelopment()) {
     console.error("❌ Erro:", err);

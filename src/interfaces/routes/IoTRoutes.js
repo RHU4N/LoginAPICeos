@@ -1,9 +1,12 @@
 const router = require("express").Router();
 const auth = require("../../infrastructure/middleware/AuthMiddleware");
+const serviceAuth = require("../../infrastructure/middleware/ServiceAuthMiddleware");
 const Controller = require("../controllers/IoTController");
 const UseCases = require("../../application/use_cases/IoTUseCases");
 const Repository = require("../../infrastructure/repositories/IoTMeasurementRepositoryImpl");
 const controller = new Controller(new UseCases(new Repository()));
+router.post("/internal/measurements", serviceAuth, (req, res, next) => controller.ingestEvent(req, res, next));
+router.get("/internal/health", serviceAuth, (req, res, next) => controller.readiness(req, res, next));
 router.post("/measurements", auth, (req, res, next) => controller.create(req, res, next));
 router.get("/measurements", auth, (req, res, next) => controller.list(req, res, next));
 router.get("/measurements/:id", auth, (req, res, next) => controller.get(req, res, next));
