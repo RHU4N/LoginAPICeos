@@ -1,7 +1,7 @@
 name: CI - Persistência IoT
 on:
   push:
-    branches: [master, 'feat/SCRUM-75-*']
+    branches: [master, 'feat/SCRUM-75-*', 'feat/SCRUM-81-*']
   pull_request:
     branches: [master]
 permissions:

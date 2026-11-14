@@ -26,7 +26,7 @@ describe('Ingestão IoT segura', () => {
     expect(next.mock.calls[0][0].statusCode).toBe(503);
   });
   function create(repository, extra = {}) {
-    return new UseCases(repository, { findOwner: async () => ({ _id: owner, ativo: true }),
+    return new UseCases(repository, { findOwner: async () => ({ _id: owner, ativo: true }), findDevice: async () => null,
       owners: () => JSON.stringify({ [fixture.deviceId]: owner }), ...extra });
   }
   test('resolve proprietário do servidor e persiste quatro recibos', async () => {

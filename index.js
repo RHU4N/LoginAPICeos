@@ -104,6 +104,8 @@ app.use("/users/historico", historicoRoutes);
 app.use("/users", userRoutes);
 app.use("/favorites", favoriteRoutes);
 app.use("/custom-functions", customFunctionRoutes);
+app.use("/iot", require('./src/interfaces/routes/IoTPlatformRoutes').router);
+app.use("/notifications", require('./src/interfaces/routes/IoTPlatformRoutes').notifications);
 app.use("/iot", iotRoutes);
 app.use("/historicos", historicoRoutes);
 
@@ -142,6 +144,8 @@ async function startServer() {
   try {
     // Conectar ao banco de dados
     await connectDatabase();
+    // Additive indexes only. Required uniqueness must exist before accepting commands.
+    for (const model of Object.values(require('./src/domain/entities/IoTPlatform'))) await model.createIndexes();
 
     // Iniciar server
     const port = environment.PORT;

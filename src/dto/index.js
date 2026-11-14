@@ -338,6 +338,7 @@ class IoTMeasurementResponseDTO {
     this.timestamp = measurement.timestamp;
     this.localizacao = measurement.localizacao;
     this.criadoEm = measurement.criadoEm;
+    this.metadata = measurement.metadata;
   }
 }
 
@@ -350,10 +351,16 @@ class QueryIoTDTO {
     this.limit = Math.min(parseInt(query.limit, 10) || 50, 1000);
     this.startDate = query.startDate;
     this.endDate = query.endDate;
+    this.order = query.order || 'desc';
+    this.eventId = query.eventId;
   }
 
   validate() {
     if (this.page < 1) throw new ValidationError("page deve ser >= 1");
+    for (const key of ['deviceId', 'sensorId', 'sensorTipo', 'eventId']) if (this[key] !== undefined && (typeof this[key] !== 'string' || this[key].length > 100)) throw new ValidationError('Filtro inválido.');
+    if (!['asc', 'desc'].includes(this.order)) throw new ValidationError('Ordenação inválida.');
+    for (const key of ['startDate', 'endDate']) if (this[key] && (typeof this[key] !== 'string' || !Number.isFinite(Date.parse(this[key])))) throw new ValidationError('Data inválida.');
+    if (this.startDate && this.endDate && Date.parse(this.startDate) > Date.parse(this.endDate)) throw new ValidationError('Período inválido.');
     if (this.limit < 1 || this.limit > 1000)
       throw new ValidationError("limit deve estar entre 1 e 1000");
   }

@@ -34,9 +34,9 @@ class IoTMeasurementRepositoryImpl {
   }
   create(data) { return new IoTMeasurement(data).save(); }
   findOwned(id, userId) { return IoTMeasurement.findOne({ _id: id, userId }); }
-  async list(filters, page, limit) {
+  async list(filters, page, limit, order = 'desc') {
     const [items, total] = await Promise.all([
-      IoTMeasurement.find(filters).sort({ timestamp: -1 }).skip((page - 1) * limit).limit(limit),
+      IoTMeasurement.find(filters).sort({ timestamp: order === 'asc' ? 1 : -1, _id: order === 'asc' ? 1 : -1 }).skip((page - 1) * limit).limit(limit),
       IoTMeasurement.countDocuments(filters),
     ]);
     return { items, total };

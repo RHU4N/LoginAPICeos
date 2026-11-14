@@ -27,15 +27,7 @@ const IoTMeasurementSchema = new Schema(
     sensorTipo: {
       type: String,
       required: true,
-      enum: [
-        "temperatura",
-        "umidade",
-        "pressao",
-        "luz",
-        "movimento",
-        "gas",
-        "outro",
-      ],
+      maxlength: 64,
       index: true,
     },
 
@@ -129,6 +121,8 @@ IoTMeasurementSchema.index({ deviceId: 1, timestamp: -1 });
 IoTMeasurementSchema.index({ sensorId: 1, timestamp: -1 });
 IoTMeasurementSchema.index({ deviceId: 1, sensorId: 1, timestamp: -1 });
 IoTMeasurementSchema.index({ timestamp: -1 });
+IoTMeasurementSchema.index({ userId: 1, deviceId: 1, timestamp: -1 });
+IoTMeasurementSchema.index({ userId: 1, 'metadata.eventId': 1 });
 IoTMeasurementSchema.index({ sensorTipo: 1, timestamp: -1 });
 IoTMeasurementSchema.index({ processado: 1, criadoEm: -1 });
 // TTL Index para auto-cleanup (manter últimos 90 dias)
