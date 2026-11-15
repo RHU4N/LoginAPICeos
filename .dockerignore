@@ -1,4 +1,9 @@
 node_modules
 .git
-.env
+.env*
+!.env.example
+**/.secrets/
+.codex/
+*.pem
+*.key
 npm-debug.log*
