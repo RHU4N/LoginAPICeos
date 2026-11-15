@@ -72,6 +72,8 @@ const environment = {
 
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:3000",
+  // Explicit additional origins only, e.g. the reviewed migration Preview URL.
+  CORS_ORIGINS: (process.env.CORS_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean),
 
   // A documentação interativa é útil localmente, mas não deve ficar pública
   // em produção sem uma proteção adicional.

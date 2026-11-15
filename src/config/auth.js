@@ -13,6 +13,10 @@ const developmentWebOrigins = [
 
 const allowedCorsOrigins = [
   environment.CORS_ORIGIN,
+  ...environment.CORS_ORIGINS.filter(origin => {
+    try { const parsed = new URL(origin); return parsed.protocol === 'https:' && parsed.origin === origin && !parsed.hostname.includes('*'); }
+    catch { return false; }
+  }),
   ...(!environment.isProduction() ? developmentWebOrigins : []),
 ];
 
@@ -118,7 +122,7 @@ const authConfig = {
     origin: (origin, callback) => callback(null, isCorsOriginAllowed(origin)),
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CEOS-Client", "Idempotency-Key"],
   },
 
   allowedCorsOrigins,

@@ -61,7 +61,7 @@ const createRequest = (d, key = randomUUID()) =>
   );
 before(
   async () => {
-    mongo = await MongoMemoryServer.create();
+    mongo = await MongoMemoryServer.create({ instance: { launchTimeout: 90000 } });
     process.env.MONGO_URI = mongo.getUri();
     await mongoose.connect(process.env.MONGO_URI);
     app = require("../../index");
@@ -119,6 +119,10 @@ test("secure pairing, hashed secrets, IDOR and unsupported push-only device", as
     otherToken,
   ).expect(404);
   await createRequest(d).expect(409);
+  const unchanged = await api("patch", `/iot/devices/${d.deviceId}`, {
+    ownerId: new mongoose.Types.ObjectId().toString(), userId: "forged-owner", nome: "Owner unchanged",
+  }).expect(200);
+  assert.equal(unchanged.body.data.ownerId, String(userId));
   await deviceApi(
     { ...d, deviceToken: randomBytes(32).toString("base64url") },
     "get",
@@ -201,9 +205,13 @@ test("durable dispatch, lease, correlation, partial writes, retry, completion an
     .body.data;
   assert.equal(done.status, "COMPLETED");
   assert.equal(done.resultEventId, event.eventId);
+  await api("get", `/iot/requests/${r.requestId}`, undefined, otherToken).expect(404);
+  const otherHistory = await api("get", `/iot/measurements?eventId=${event.eventId}`, undefined, otherToken).expect(200);
+  assert.equal(otherHistory.body.pagination.total, 0);
   const notes = (await api("get", "/notifications").expect(200)).body.data
     .items;
   assert.equal(notes.length, 1);
+  await api("patch", `/notifications/${notes[0].notificationId}/read`, {}, otherToken).expect(404);
   assert.equal(
     (await api("get", "/notifications/unread-count").expect(200)).body.data
       .count,
@@ -272,6 +280,11 @@ test("offline expiration, repair after notification failure, cancellation and re
   await api("post", `/iot/requests/${r2.requestId}/cancel`, {}).expect(200);
   await api("post", `/iot/devices/${d.deviceId}/revoke`, {}).expect(200);
   await deviceApi(d, "get", "commands").expect(401);
+  await createRequest(d).expect(409);
+  await internal("prepare", {
+    event: { deviceId: d.deviceId, eventId: randomUUID(), measurements: [{ sensorId: "temp", valor: 1 }] },
+    deviceToken: d.deviceToken,
+  }).expect(401);
   const rotate = (
     await api("post", `/iot/devices/${d.deviceId}/rotate`, {}).expect(200)
   ).body.data;
