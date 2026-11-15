@@ -19,8 +19,7 @@ const csrfMiddleware = require("./src/infrastructure/middleware/CsrfMiddleware")
 
 // Criar app Express
 const app = express();
-// Habilitar somente com a topologia de proxy verificada (Render: um salto).
-if (/^[1-9][0-9]?$/.test(process.env.TRUST_PROXY_HOPS || '')) app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS));
+app.set('trust proxy', require('./src/config/trustProxy')());
 const port = process.env.PORT || 8081;
 const successResponse = require('./src/interfaces/responses/successResponse');
 

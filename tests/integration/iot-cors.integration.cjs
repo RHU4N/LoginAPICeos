@@ -4,6 +4,8 @@ const { randomBytes } = require('node:crypto');
 const request = require('supertest');
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
+const previewOrigin = 'https://ceos-reviewed-migration.vercel.app';
+process.env.CORS_ORIGINS = `${previewOrigin},https://*.vercel.app,http://unsafe.invalid,https://invalid.example/path`;
 const app = require('../../index');
 
 test('browser READ_ONCE preflight permits the idempotency header and credentials for a trusted origin', async () => {
@@ -27,4 +29,18 @@ test('an untrusted origin receives no CORS grant', async () => {
     .set('Access-Control-Request-Headers', 'idempotency-key');
   assert.equal(response.headers['access-control-allow-origin'], undefined);
   assert.equal(response.headers['access-control-allow-credentials'], undefined);
+});
+
+test('only explicitly configured HTTPS Preview origins pass both CORS and cookie CSRF', async () => {
+  const response = await request(app).options('/auth/refresh').set('Origin', previewOrigin)
+    .set('Access-Control-Request-Method', 'POST').expect(204);
+  assert.equal(response.headers['access-control-allow-origin'], previewOrigin);
+  // The fake refresh token reaches validation only if CSRF allows this exact origin.
+  await request(app).post('/auth/refresh').set('Origin', previewOrigin)
+    .set('Cookie', 'refreshToken=invalid').send({}).expect(401);
+  for (const origin of ['https://another.vercel.app', 'http://unsafe.invalid', 'https://invalid.example/path']) {
+    const r = await request(app).post('/auth/refresh').set('Origin', origin)
+      .set('Cookie', 'refreshToken=invalid').send({}).expect(403);
+    assert.equal(r.body.error.code, 'CSRF_ORIGIN_DENIED');
+  }
 });

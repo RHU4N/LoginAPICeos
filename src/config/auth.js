@@ -13,6 +13,10 @@ const developmentWebOrigins = [
 
 const allowedCorsOrigins = [
   environment.CORS_ORIGIN,
+  ...environment.CORS_ORIGINS.filter(origin => {
+    try { const parsed = new URL(origin); return parsed.protocol === 'https:' && parsed.origin === origin && !parsed.hostname.includes('*'); }
+    catch { return false; }
+  }),
   ...(!environment.isProduction() ? developmentWebOrigins : []),
 ];
 
