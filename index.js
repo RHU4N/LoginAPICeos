@@ -62,19 +62,12 @@ if (environment.isDevelopment()) {
   });
 }
 
-// Health check
-app.get("/health", (req, res) => {
-  return successResponse(
-    res,
-    {
-      status: "OK",
-      environment: environment.NODE_ENV,
-      database: "connected",
-      timestamp: new Date().toISOString(),
-    },
-    "API em funcionamento",
-  );
-});
+// Health checks: /health = liveness (probe do App Service, sem I/O); /ready = readiness (ping no MongoDB).
+// /health não afirma que o banco foi verificado; use /ready em monitoramento externo.
+app.use(require("./src/interfaces/routes/HealthRoutes").createHealthRouter({
+  connection: require("mongoose").connection,
+  environment: environment.NODE_ENV,
+}));
 
 // Raiz
 app.get("/", (req, res) => {
