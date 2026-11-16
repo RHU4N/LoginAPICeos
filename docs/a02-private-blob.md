@@ -4,6 +4,8 @@ O container existente saceos02/ceos-files permanece privado. O gateway GET /asse
 
 O runtime utiliza ManagedIdentityCredential. Antes de habilitar, é necessário configurar identidade gerenciada no App Service e conceder Storage Blob Data Reader **somente no container ceos-files**, além dos ajustes abaixo. O backend não recebe chave do navegador e não gera SAS público. O frontend usa o rewrite /api/login existente e mantém os assets locais como fallback de disponibilidade.
 
+Dependência de publicação: este gateway deve ser validado antes de ativar https://github.com/RHU4N/Ceos/pull/15. A correção de imagem Docker do frontend em https://github.com/RHU4N/Ceos/pull/14 é independente deste gateway e não altera o runtime Azure das APIs. Os PRs anteriores já integrados não são reutilizados.
+
 Configurações privadas do servidor (nomes e valores públicos): AZURE_SITE_ASSETS_ACCOUNT=saceos02 e AZURE_SITE_ASSETS_CONTAINER=ceos-files. Deixar a conta ausente desabilita o gateway com 503, preservando o comportamento atual. Não adicionar Storage Account Key nem connection string em REACT_APP_*.
 
 Upload administrativo: scripts/upload-site-assets.ps1 requer assinatura explícita e diretório público do frontend; usa Entra ID por padrão. O operador precisa de permissão de dados no container. O switch UseSharedKey é uma alternativa administrativa explícita, mantendo a chave somente na CLI. O script preserva todos os objetos existentes e cria apenas nomes ausentes com overwrite=false. Não altera permissões, retenção, container ou Storage Account.
