@@ -40,8 +40,8 @@ done
 test "$ready" = true
 test "$(curl -s -o /tmp/qa-denied.json -w '%{http_code}' http://127.0.0.1:$port/auth/me)" = 401
 test "$(curl -s -o /tmp/qa-swagger.html -w '%{http_code}' http://127.0.0.1:$port/api-docs/)" = 404
-status=$(curl -s -o /tmp/qa-user.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"nome":"Docker QA","email":"docker-qa@example.invalid","senha":"DockerQa!7264Safe","telefone":"11999999999"}' http://127.0.0.1:$port/users)
-test "$status" = 201
+status=$(curl -s -o /tmp/qa-user.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"nome":"Docker QA","email":"docker-qa@example.invalid","senha":"DockerQa!7264Safe","confirmaSenha":"DockerQa!7264Safe","telefone":"11999999999"}' http://127.0.0.1:$port/users)
+if [ "$status" != 201 ]; then echo "Isolated signup expected 201, received $status"; exit 1; fi
 curl -fsS -H 'Content-Type: application/json' -d '{"email":"docker-qa@example.invalid","senha":"DockerQa!7264Safe"}' http://127.0.0.1:$port/auth/login -D /tmp/qa-session.headers -o /tmp/qa-session.json
 grep -qi 'HttpOnly' /tmp/qa-session.headers
 echo 'Login: production startup, isolated Mongo persistence, cookie login, auth denial and Swagger disabled passed.'
