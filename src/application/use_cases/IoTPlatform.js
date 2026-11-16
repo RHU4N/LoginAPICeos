@@ -18,6 +18,23 @@ const secret = () => randomBytes(32).toString("base64url");
 const fail = (message, status = 400, code = "IOT_INVALID_INPUT") => {
   throw new AppError(message, status, code);
 };
+// Prazos do READ_ONCE (segundos), centralizados e validados.
+// O lease cobre: entrega do comando, ACK e ingresso v2 (Function -> /iot/internal/prepare).
+// 30 s era insuficiente para o ESP32 simulado no Wokwi, em que cada HTTPS leva dezenas de segundos.
+const READ_ONCE_DEFAULTS = { ttlSeconds: 300, leaseSeconds: 120 };
+const boundedInt = (raw, fallback, min, max) => {
+  const value = Number(raw);
+  if (raw === undefined || raw === "" || !Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(value)));
+};
+function readOnceTimings(env = process.env) {
+  const ttlSeconds = boundedInt(env.CEOS_IOT_REQUEST_TTL_SECONDS, READ_ONCE_DEFAULTS.ttlSeconds, 30, 600);
+  const leaseSeconds = Math.min(
+    boundedInt(env.CEOS_IOT_LEASE_SECONDS, READ_ONCE_DEFAULTS.leaseSeconds, 30, 300),
+    ttlSeconds,
+  );
+  return { ttlSeconds, leaseSeconds };
+}
 function text(value, max = 120, required = false) {
   if (
     typeof value !== "string" ||
@@ -469,17 +486,7 @@ class IoTPlatform {
           deviceId,
           status: "QUEUED",
           queuedAt: new Date(),
-          expiresAt: new Date(
-            Date.now() +
-              Math.max(
-                30,
-                Math.min(
-                  600,
-                  Number(process.env.CEOS_IOT_REQUEST_TTL_SECONDS) || 180,
-                ),
-              ) *
-                1000,
-          ),
+          expiresAt: new Date(Date.now() + readOnceTimings().ttlSeconds * 1000),
           idempotencyKey: key,
           activeDevice: deviceId,
           activeSlot: slot,
@@ -512,6 +519,7 @@ class IoTPlatform {
   }
   async commands(device) {
     const leaseToken = secret();
+    const { leaseSeconds } = readOnceTimings();
     const now = new Date();
     const r = await ReadRequest.findOneAndUpdate(
       {
@@ -531,7 +539,7 @@ class IoTPlatform {
         $set: {
           status: "MEASURING",
           startedAt: now,
-          leaseUntil: new Date(Date.now() + 30000),
+          leaseUntil: new Date(now.getTime() + leaseSeconds * 1000),
           leaseHash: hash(leaseToken),
         },
         $inc: { attempts: 1 },
@@ -545,7 +553,7 @@ class IoTPlatform {
             requestId: r.requestId,
             expiresAt: r.expiresAt,
             leaseToken,
-            leaseSeconds: 30,
+            leaseSeconds,
           },
         ]
       : [];
@@ -808,4 +816,4 @@ class IoTPlatform {
     return devices.map(clean);
   }
 }
-module.exports = { IoTPlatform, ACTIVE, clean, digest };
+module.exports = { IoTPlatform, ACTIVE, clean, digest, readOnceTimings, READ_ONCE_DEFAULTS };
