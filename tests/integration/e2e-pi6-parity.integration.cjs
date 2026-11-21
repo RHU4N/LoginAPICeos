@@ -12,7 +12,49 @@ process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.CEOS_SERVICE_KEY = randomBytes(32).toString('hex');
 process.env.CEOS_IOT_COMMANDS_ENABLED = 'true';
 
-const mathApiAppPath = path.resolve(__dirname, '../../../MathAPI/app.js');
+/**
+ * Resolve o alvo da MathAPI de forma explícita e reproduzível:
+ * 1) MATH_API_URL (instância HTTP já ativa, ideal para CI ou containers separados)
+ * 2) MATH_API_APP_PATH ou caminhos irmãos locais até MathAPI/app.js
+ * Caso nenhum esteja presente (ex.: runner CI isolado apenas com LoginAPICeos),
+ * os testes são pulados explicitamente sem falhar silenciosamente.
+ */
+function resolveMathTarget() {
+  if (['1', 'true'].includes((process.env.MATH_API_SKIP || '').trim().toLowerCase())) {
+    return {
+      mode: 'unavailable',
+      skipReason: 'MathAPI desabilitada explicitamente via MATH_API_SKIP.',
+    };
+  }
+  const envUrl = (process.env.MATH_API_URL || '').trim().replace(/\/+$/, '');
+  if (envUrl) {
+    return { mode: 'remote', url: envUrl, skipReason: null };
+  }
+
+  const candidates = [
+    process.env.MATH_API_APP_PATH,
+    path.resolve(__dirname, '../../../MathAPI/app.js'),
+    path.resolve(__dirname, '../../MathAPI/app.js'),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate);
+    if (fs.existsSync(resolved)) {
+      return { mode: 'local', appPath: resolved, skipReason: null };
+    }
+  }
+
+  return {
+    mode: 'unavailable',
+    skipReason:
+      'MathAPI indisponível: defina MATH_API_URL, MATH_API_APP_PATH ou mantenha o checkout irmão ../MathAPI.',
+  };
+}
+
+const mathTarget = resolveMathTarget();
+const runParityTest = mathTarget.skipReason
+  ? (name, fn) => test(name, { skip: mathTarget.skipReason }, fn)
+  : test;
 
 function startHttpServer(expressApp) {
   return new Promise((resolve, reject) => {
@@ -88,8 +130,8 @@ let mobileRefreshA = '';
 let mobileTokenB = '';
 
 before(async () => {
-  if (!fs.existsSync(mathApiAppPath)) {
-    throw new Error(`MathAPI não encontrada em ${mathApiAppPath}`);
+  if (mathTarget.mode === 'unavailable') {
+    return;
   }
   mongo = await MongoMemoryServer.create({ instance: { launchTimeout: 90000 } });
   process.env.MONGO_URI = mongo.getUri();
@@ -97,7 +139,6 @@ before(async () => {
   await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.MONGODB_DATABASE });
 
   const loginApp = require('../../index');
-  const { createApp: createMathApp } = require(mathApiAppPath);
 
   const iotModels = Object.values(require('../../src/domain/entities/IoTPlatform'));
   for (const Model of iotModels) {
@@ -108,9 +149,14 @@ before(async () => {
   loginServer = startedLogin.server;
   loginUrl = startedLogin.baseUrl;
 
-  const startedMath = await startHttpServer(createMathApp());
-  mathServer = startedMath.server;
-  mathUrl = startedMath.baseUrl;
+  if (mathTarget.mode === 'remote') {
+    mathUrl = mathTarget.url;
+  } else {
+    const { createApp: createMathApp } = require(mathTarget.appPath);
+    const startedMath = await startHttpServer(createMathApp());
+    mathServer = startedMath.server;
+    mathUrl = startedMath.baseUrl;
+  }
 
   const regA = await httpJson(`${loginUrl}/users`, { method: 'POST', body: userA });
   assert.equal(regA.status, 201);
@@ -147,13 +193,13 @@ before(async () => {
 }, { timeout: 180000 });
 
 after(async () => {
-  await stopHttpServer(loginServer);
-  await stopHttpServer(mathServer);
-  await mongoose.disconnect();
+  if (loginServer) await stopHttpServer(loginServer);
+  if (mathServer) await stopHttpServer(mathServer);
+  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
   if (mongo) await mongo.stop();
 });
 
-test('Química (Estequiometria, Termoquímica, Soluções) e regressão via HTTP real da MathAPI', async () => {
+runParityTest('Química (Estequiometria, Termoquímica, Soluções) e regressão via HTTP real da MathAPI', async () => {
   const bal = await httpJson(`${mathUrl}/estequiometria/balanceamento`, {
     method: 'POST',
     body: { equacao: 'H2 + O2 -> H2O' },
@@ -258,7 +304,7 @@ test('Química (Estequiometria, Termoquímica, Soluções) e regressão via HTTP
   assert.equal(linear.body.data.resultado, 11);
 });
 
-test('Fluxo IoT READ_ONCE -> evento completo -> Ponto de Orvalho (MathAPI) -> Histórico e isolamento', async () => {
+runParityTest('Fluxo IoT READ_ONCE -> evento completo -> Ponto de Orvalho (MathAPI) -> Histórico e isolamento', async () => {
   const webHeaders = { Cookie: webCookieA, Origin: webOrigin };
   const mobHeadersA = { Authorization: `Bearer ${mobileTokenA}` };
   const mobHeadersB = { Authorization: `Bearer ${mobileTokenB}` };
@@ -398,7 +444,7 @@ test('Fluxo IoT READ_ONCE -> evento completo -> Ponto de Orvalho (MathAPI) -> Hi
   assert.equal(otherDevices.body.data.length, 0);
 });
 
-test('Paridade Web <-> Mobile em Favoritos e Funções Personalizadas + Refresh Token', async () => {
+runParityTest('Paridade Web <-> Mobile em Favoritos e Funções Personalizadas + Refresh Token', async () => {
   const webHeaders = { Cookie: webCookieA, Origin: webOrigin };
   const mobHeadersA = { Authorization: `Bearer ${mobileTokenA}` };
   const mobHeadersB = { Authorization: `Bearer ${mobileTokenB}` };

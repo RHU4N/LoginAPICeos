@@ -1,8 +1,10 @@
-name: Performance - loginAPI (k6 smoke)
+name: Performance - loginAPI (k6 benchmark)
 
 on:
   push:
     branches: [ devops, main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
   schedule:
     - cron: '0 */6 * * *'
@@ -10,65 +12,100 @@ on:
 jobs:
   perf:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve target URL
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies (for isolated CI fallback)
+        run: npm ci --no-audit --no-fund
+
+      - name: Resolve target URL (start isolated CI server if external URL not set)
         run: |
           TARGET="${{ secrets.CEOS_LOGIN_API_URL }}"
           if [ -z "$TARGET" ]; then TARGET="${{ vars.CEOS_LOGIN_API_URL }}"; fi
           if [ -z "$TARGET" ]; then TARGET="${{ secrets.LOGIN_URL }}"; fi
           if [ -z "$TARGET" ]; then TARGET="${{ vars.LOGIN_URL }}"; fi
-          if [ -z "$TARGET" ]; then echo "ERROR: No LOGIN_URL configured"; exit 1; fi
+
+          if [ -z "$TARGET" ]; then
+            echo "No external LOGIN_URL configured; starting isolated CI LoginAPICeos with Mongo 6.0 on http://127.0.0.1:8081"
+            NODE_ENV=test \
+            PORT=8081 \
+            MONGO_URI=mongodb://127.0.0.1:27017/ceos_perf_ci \
+            MONGODB_DATABASE=ceos_perf_ci \
+            JWT_SECRET=ci-perf-ephemeral-secret-not-for-production-use \
+            BCRYPT_ROUNDS=10 \
+            ENABLE_SWAGGER=false \
+            node index.js > ./perf-server.log 2>&1 &
+            echo $! > perf-server.pid
+            TARGET="http://127.0.0.1:8081"
+          fi
+
           echo "TARGET_URL=$TARGET" >> $GITHUB_ENV
 
       - name: Install k6
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnupg2 software-properties-common
-          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
-          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get install -y gnupg2 ca-certificates curl
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
           sudo apt-get install -y k6
 
-
-      - name: Health check / warm up
+      - name: Wait for target readiness
         run: |
-          echo "Checking target: $TARGET_URL"
-          HEALTH_URL="$TARGET_URL"
-          for i in 1 2 3 4 5 6; do
-            if curl -fsS --max-time 5 "$HEALTH_URL/health" -o /dev/null; then
-              echo "health OK on $HEALTH_URL/health"; break
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$TARGET_URL/ready" -o /dev/null || curl -fsS --max-time 5 "$TARGET_URL/health" -o /dev/null; then
+              echo "target ready on $TARGET_URL"
+              exit 0
             fi
-            if curl -fsS --max-time 5 "$HEALTH_URL" -o /dev/null; then
-              echo "root OK on $HEALTH_URL"; break
-            fi
-            echo "waiting for $HEALTH_URL (attempt $i/6)..."
-            sleep 5
+            echo "waiting for $TARGET_URL ($i/30)..."
+            sleep 1
           done
+          echo "::error::Target did not respond in time"
+          tail -n 50 ./perf-server.log || true
+          exit 1
 
-      - name: Run k6 smoke test (capture exit code)
+      - name: Run k6 benchmark (1 VU baseline + 10 VUs)
         env:
-          FAIL_ON_THRESHOLD: ${{ env.FAIL_ON_THRESHOLD }}
+          FAIL_ON_THRESHOLD: ${{ vars.FAIL_ON_THRESHOLD || 'true' }}
         run: |
           set +e
-          k6 run --out json=results-k6.json tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL"
+          k6 run tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL" --env K6_VUS=1 --env K6_DURATION=5s --env K6_SLEEP_MS=50
+          RC_BASE=$?
+          k6 run --summary-export=results-k6-summary.json tests/perf/k6_test.js --env TARGET_URL="$TARGET_URL" --env K6_VUS="${K6_VUS:-10}" --env K6_DURATION="${K6_DURATION:-15s}" --env K6_SLEEP_MS="${K6_SLEEP_MS:-50}"
           RC=$?
-          echo $RC > k6-rc.txt
           set -e
-          echo "k6 exit code: $RC"
+          echo "k6 exit codes -> baseline=$RC_BASE load=$RC"
           if [ "${FAIL_ON_THRESHOLD}" = "true" ]; then
-            if [ "$RC" -ne 0 ]; then
-              echo "Failing because FAIL_ON_THRESHOLD=true and k6 exit code=$RC"; exit $RC
+            if [ "$RC_BASE" -ne 0 ] || [ "$RC" -ne 0 ]; then
+              echo "::error::k6 threshold failed (baseline=$RC_BASE, load=$RC)"
+              exit 1
             fi
-          else
-            echo "Not failing on k6 thresholds (FAIL_ON_THRESHOLD not set or not 'true').";
           fi
 
-      - name: Upload k6 report
+      - name: Stop local fallback server
+        if: always()
+        run: |
+          if [ -f perf-server.pid ]; then
+            kill $(cat perf-server.pid) || true
+            rm -f perf-server.pid
+          fi
+
+      - name: Upload k6 summary report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: loginAPI-k6-report
-          path: results-k6.json
+          path: results-k6-summary.json

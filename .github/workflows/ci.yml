@@ -18,95 +18,48 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
       - name: Install
         run: npm ci --no-audit --no-fund
-      - name: Run tests
+      - name: Run unit tests (Jest)
         run: npm test -- --runInBand
       - name: Check JavaScript syntax
         run: npm run lint
 
-  infra-tests:
-    name: Infra Tests - loginAPI (GitHub Actions mongo service + Newman)
+  integration:
+    name: Integration Tests - loginAPI (MongoMemoryServer)
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    # provide a MongoDB service container for more stable CI than mongodb-memory-server
-    services:
-      mongo:
-        image: mongo:6.0
-        ports:
-          - 27017:27017
+    timeout-minutes: 15
     env:
-      MONGO_URI: mongodb://127.0.0.1:27017/ceos_ci
-      MONGODB_DATABASE: ceos_ci
       NODE_ENV: test
-      JWT_SECRET: ci-only-not-a-production-secret-please-change
-      PORT: 8081
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.cache/mongodb
     steps:
       - uses: actions/checkout@v4
-
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
-      - name: Install dependencies
-        run: |
-          npm ci --no-audit --no-fund
-
-      - name: Start loginAPI (uses Actions mongo)
-        run: |
-          touch server.log || true
-          node index.js > ./server.log 2>&1 &
-          echo $! > server.pid
-
-      - name: Wait for service (health)
-        run: |
-          set -e
-          for i in $(seq 1 60); do
-            if curl -sfS http://localhost:8081/ >/dev/null 2>&1; then
-              echo "service is up"; exit 0
-            fi
-            if curl -sfS http://localhost:8081/health >/dev/null 2>&1; then
-              echo "service is healthy"; exit 0
-            fi
-            echo "waiting for service... ($i)"; sleep 2
-          done
-          echo "::error::service did not become ready in time"
-          tail -n 60 ./server.log || true
-          exit 1
-
-      - name: Run Newman collection (login) against Actions mongo
-        run: |
-          echo "---- server.log (head) ----"
-          head -n 20 ./server.log || true
-          npm install newman --no-save
-          npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail || {
-            echo "Newman failed; dumping server.log";
-            echo "---- server.log (full) ----";
-            tail -n 60 ./server.log || true;
-            exit 1;
-          }
-
-      - name: Upload server log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
+          cache: npm
+      - name: Cache MongoMemoryServer binaries
+        uses: actions/cache@v4
         with:
-          name: login-server-log
-          path: server.log
-
-      - name: Stop infra server
-        if: always()
-        run: |
-          if [ -f server.pid ]; then
-            kill $(cat server.pid) || true
-            rm -f server.pid
-          fi
+          path: ${{ github.workspace }}/.cache/mongodb
+          key: mongoms-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            mongoms-${{ runner.os }}-
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Run real integration suites (node:test + MongoMemoryServer)
+        run: npm run test:integration
+      - name: Run multi-repo parity suite (skips cleanly if MATH_API_URL unset)
+        run: npm run test:integration:parity
 
   newman-login:
-    name: Newman - Login tests (integration)
+    name: Newman - loginAPI (Mongo 6.0 service)
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       mongo:
         image: mongo:6.0
@@ -117,58 +70,47 @@ jobs:
       MONGODB_DATABASE: ceos_ci_newman
       NODE_ENV: test
       JWT_SECRET: ci-only-not-a-production-secret-please-change
+      PORT: 8081
     steps:
       - uses: actions/checkout@v4
-
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
+          cache: npm
       - name: Install dependencies (loginAPI)
-        run: |
-          npm ci --no-audit --no-fund
-
-      - name: Start loginAPI server (integration)
-        env:
-          PORT: 8081
+        run: npm ci --no-audit --no-fund
+      - name: Start loginAPI server (Mongo 6.0)
         run: |
           touch server.log || true
           node index.js > ./server.log 2>&1 &
           echo $! > server.pid
           n=0
-          until curl -sSf http://localhost:8081/ >/dev/null 2>&1 || [ $n -ge 30 ]; do
+          until curl -sSf http://localhost:8081/health >/dev/null 2>&1 || [ $n -ge 30 ]; do
             n=$((n+1))
             echo "waiting for server... $n"
             sleep 1
           done
           if [ $n -ge 30 ]; then
             echo "Server did not start in time"
-            echo "---- server.log ----"
             tail -n 60 ./server.log || true
             exit 1
           fi
-
       - name: Run Newman collection (login)
         run: |
-          echo "---- server.log (head) ----"
-          head -n 20 ./server.log || true
           npm install newman --no-save
           npx newman run postman/login.postman_collection.json -e postman/login.postman_environment.json --timeout-request 15000 --bail || {
-            echo "Newman failed; dumping server.log";
-            echo "---- server.log (full) ----";
-            tail -n 60 ./server.log || true;
-            exit 1;
+            echo "Newman failed; dumping server.log"
+            tail -n 60 ./server.log || true
+            exit 1
           }
-
       - name: Upload server log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: login-integration-server-log
           path: server.log
-
-      - name: Stop integration server
+      - name: Stop server
         if: always()
         run: |
           if [ -f server.pid ]; then

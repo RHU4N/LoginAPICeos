@@ -1,22 +1,28 @@
 const LoginUseCase = require('../src/application/use_cases/LoginUseCase');
+const { ValidationError } = require('../src/errors/AppError');
+const { resetAttempts } = require('../src/infrastructure/middleware/BruteForceMiddleware');
 
 describe('LoginUseCase (unit)', () => {
-  test('returns token pair and public user when credentials are valid', async () => {
+  test('returns token pair with custom tokenVersion/role and public user when credentials are valid', async () => {
+    const email = 'any@e.mail';
+    resetAttempts(email);
     const fakeUser = {
       _id: 'abc123',
       nome: 'João',
-      email: 'joao@example.com',
+      email,
       senha: 'hashedpwd',
+      tokenVersion: 3,
+      role: 'ADMIN',
       ativo: true,
       save: jest.fn(),
     };
 
     const userUseCases = {
-      getUserByEmail: jest.fn().mockResolvedValue(fakeUser)
+      getUserByEmail: jest.fn().mockResolvedValue(fakeUser),
     };
 
     const passwordHasher = {
-      compare: jest.fn().mockResolvedValue(true)
+      compare: jest.fn().mockResolvedValue(true),
     };
 
     const tokenProvider = {
@@ -27,15 +33,15 @@ describe('LoginUseCase (unit)', () => {
     };
 
     const login = new LoginUseCase(userUseCases, passwordHasher, tokenProvider);
-    const result = await login.execute('any@e.mail', 'plainpwd');
+    const result = await login.execute(email, 'plainpwd');
 
-    expect(userUseCases.getUserByEmail).toHaveBeenCalledWith('any@e.mail');
+    expect(userUseCases.getUserByEmail).toHaveBeenCalledWith(email);
     expect(passwordHasher.compare).toHaveBeenCalledWith('plainpwd', fakeUser.senha);
     expect(tokenProvider.generateTokenPair).toHaveBeenCalledWith(
       fakeUser._id,
       fakeUser.email,
-      0,
-      'USER',
+      3,
+      'ADMIN',
     );
     expect(result).toMatchObject({
       accessToken: 'access-token',
@@ -43,10 +49,12 @@ describe('LoginUseCase (unit)', () => {
       user: { id: fakeUser._id, email: fakeUser.email },
     });
     expect(result.user).not.toHaveProperty('senha');
+    expect(result.user).not.toHaveProperty('tokenVersion');
+    resetAttempts(email);
   });
 
-  test('throws when missing credentials', async () => {
+  test('throws ValidationError when missing credentials', async () => {
     const login = new LoginUseCase({}, {}, {});
-    await expect(login.execute(null, null)).rejects.toThrow();
+    await expect(login.execute(null, null)).rejects.toThrow(ValidationError);
   });
 });
