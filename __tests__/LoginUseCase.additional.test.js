@@ -1,28 +1,28 @@
 const LoginUseCase = require('../src/application/use_cases/LoginUseCase');
 const {
-  MissingCredentialsError,
   UserNotFoundError,
   InvalidPasswordError,
 } = require('../src/application/errors/AuthErrors');
+const { ValidationError } = require('../src/errors/AppError');
 
-describe('LoginUseCase (unit)', () => {
-  test('throws MissingCredentialsError when missing email or senha', async () => {
+describe('LoginUseCase (unit - domain errors)', () => {
+  test('throws ValidationError when missing email or senha', async () => {
     const lc = new LoginUseCase({}, {}, {});
-    await expect(lc.execute(null, null)).rejects.toThrow();
+    await expect(lc.execute(null, null)).rejects.toThrow(ValidationError);
   });
 
   test('throws UserNotFoundError when user not found', async () => {
     const userUseCases = { getUserByEmail: async () => null };
     const lc = new LoginUseCase(userUseCases, {}, {});
-    await expect(lc.execute('a@b', 'pw')).rejects.toThrow();
+    await expect(lc.execute('a@b', 'pw')).rejects.toThrow(UserNotFoundError);
   });
 
   test('throws InvalidPasswordError when password invalid', async () => {
-    const user = { _id: 'u1', senha: 'hash' };
+    const user = { _id: 'u1', senha: 'hash', ativo: true };
     const userUseCases = { getUserByEmail: async () => user };
     const passwordHasher = { compare: async () => false };
     const lc = new LoginUseCase(userUseCases, passwordHasher, {});
-    await expect(lc.execute('a@b', 'pw')).rejects.toThrow();
+    await expect(lc.execute('a@b', 'pw')).rejects.toThrow(InvalidPasswordError);
   });
 
   test('returns token pair and public user when credentials valid', async () => {

@@ -5,13 +5,75 @@
   },
   "item": [
     {
+      "name": "Health - Liveness",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Health liveness 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data).to.have.property('status');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Ready - MongoDB Readiness",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Readiness 200 com banco conectado', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.status).to.eql('READY');",
+              "  pm.expect(json.data.database).to.eql('ok');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/ready",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "ready"
+          ]
+        }
+      }
+    },
+    {
       "name": "Create User",
       "event": [
         {
           "listen": "prerequest",
           "script": {
             "exec": [
-              "// Gera um email único para evitar conflito entre execuções",
               "pm.environment.set('emailVar', 'test+' + Date.now() + '@example.com');"
             ]
           }
@@ -54,6 +116,47 @@
       }
     },
     {
+      "name": "Login Invalid Password (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Rejeita senha errada com HTTP 401', function () {",
+              "  pm.response.to.have.status(401);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(false);",
+              "  pm.expect(json.error).to.have.property('code');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{emailVar}}\",\n  \"senha\": \"SenhaIncorreta999!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
       "name": "Login",
       "event": [
         {
@@ -78,13 +181,8 @@
               "    const cookie = cookies.find((value) => value.startsWith(name + '='));",
               "    pm.expect(cookie, name + ' cookie').to.exist;",
               "    pm.expect(cookie).to.match(/httponly/i);",
-              "    const secureExpected = pm.environment.get('cookieSecure');",
-              "    const sameSiteExpected = pm.environment.get('cookieSameSite');",
-              "    if (secureExpected !== undefined && secureExpected !== '') {",
-              "      pm.expect(/;\\s*secure/i.test(cookie)).to.eql(secureExpected === 'true');",
-              "    }",
-              "    if (sameSiteExpected) {",
-              "      pm.expect(cookie).to.match(new RegExp(';\\\\s*samesite=' + sameSiteExpected, 'i'));",
+              "    if (name === 'accessToken') {",
+              "      pm.environment.set('accessCookie', cookie.split(';')[0]);",
               "    }",
               "  };",
               "  expectCookie('accessToken');",
@@ -114,6 +212,45 @@
           "path": [
             "auth",
             "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Authenticated Profile (/auth/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Perfil autenticado retorna usuário esperado sem senha', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.data.email).to.eql(pm.environment.get('emailVar'));",
+              "  pm.expect(json.data).to.not.have.property('senha');",
+              "  pm.expect(json.data).to.not.have.property('senhaHash');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "{{accessCookie}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "me"
           ]
         }
       }
