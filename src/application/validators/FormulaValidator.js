@@ -1,105 +1,68 @@
-const { ValidationError } = require("../../errors/AppError")
+const { ValidationError } = require("../../errors/AppError");
+const FormulaEvaluator = require("../services/FormulaEvaluator");
 
 class FormulaValidator {
-    static validate(formula, parametros = []) {
-        if ( !formula || typeof formula !== "string") {
-            throw new ValidationError("Fórmula é obrigatória")
+  static validate(formula, parametros = []) {
+    FormulaEvaluator.validate(formula, parametros);
+    return true;
+  }
+
+  static validateCharacters(formula) {
+    if (!formula || typeof formula !== "string") {
+      throw new ValidationError("Fórmula é obrigatória");
+    }
+    if (formula.length > FormulaEvaluator.MAX_FORMULA_LENGTH) {
+      throw new ValidationError(
+        `Fórmula excede o limite de ${FormulaEvaluator.MAX_FORMULA_LENGTH} caracteres`,
+      );
+    }
+    const caracteresPermitidos = /^[a-zA-Z0-9_+\-*/^(),.\s]+$/;
+    if (!caracteresPermitidos.test(formula)) {
+      throw new ValidationError("Fórmula contém caracteres não permitidos");
+    }
+  }
+
+  static validateParentheses(formula) {
+    let balance = 0;
+
+    for (const char of formula) {
+      if (char === "(") {
+        balance++;
+        if (balance > FormulaEvaluator.MAX_PAREN_DEPTH) {
+          throw new ValidationError("Parênteses inválidos na fórmula");
         }
+      }
 
-        const formulaLimpa = formula.trim();
-
-        if (!formulaLimpa) {
-            throw new ValidationError("Fórmula não pode estar vazia");
+      if (char === ")") {
+        balance--;
+        if (balance < 0) {
+          throw new ValidationError("Parênteses inválidos na fórmula");
         }
-
-        this.validateCharacters(formulaLimpa);
-        this.validateParentheses(formulaLimpa);
-        this.validateVariables(formulaLimpa, parametros);
-        this.validateSyntax(formulaLimpa);
-
-        return true;
+      }
     }
 
-    static validateCharacters(formula) {
-        const caracteresPermitidos = /^[a-zA-Z0-9_+\-*/().\s]+$/;
-
-        if (!caracteresPermitidos.test(formula)) {
-            throw new ValidationError(
-                "Fórmula contém caracteres não permitidos"
-            );
-        }
+    if (balance !== 0) {
+      throw new ValidationError("Parênteses inválidos na fórmula");
     }
+  }
 
-    static validateParentheses(formula) {
-        let balance = 0;
+  static validateVariables(formula, parametros = []) {
+    const declaredNames = FormulaEvaluator.validateParametersList(parametros);
+    const variables = FormulaEvaluator.extractVariables(formula);
+    const variaveisInvalidas = variables.filter(
+      (variable) => !declaredNames.has(variable),
+    );
 
-        for (const char of formula) {
-            if (char === "(") balance++;
-
-            if (char === ")") {
-                balance--;
-
-                if (balance < 0) {
-                    throw new ValidationError(
-                        "Parênteses inválidos na fórmula"
-                    );
-                }
-            }
-        }
-
-        if (balance !== 0) {
-            throw new ValidationError(
-                "Parênteses inválidos na fórmula"
-            );
-        }
+    if (variaveisInvalidas.length > 0) {
+      throw new ValidationError(
+        `Variável não declarada: ${variaveisInvalidas[0]}`,
+      );
     }
+  }
 
-    static validateVariables(formula, parametros) {
-        const nomesParametros = parametros.map(
-            (parametro) => parametro.nome
-        );
-
-        const tokens = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
-
-        const variaveisInvalidas = tokens.filter(
-            (token) => !nomesParametros.includes(token)
-        );
-
-        if (variaveisInvalidas.length > 0) {
-            throw new ValidationError(
-                `Variável não declarada: ${variaveisInvalidas[0]}`
-            );
-        }
-    }
-
-
-    static validateSyntax(formula) {
-        const tokens = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*|\d+(?:\.\d+)?|[+\-*/()]/g) || [];
-        let expectsOperand = true;
-
-        for (const token of tokens) {
-            const isOperand = /^[a-zA-Z_]|^\d/.test(token);
-
-            if (isOperand) {
-                if (!expectsOperand) throw new ValidationError("Fórmula contém operandos sem operador");
-                expectsOperand = false;
-            } else if (token === "(") {
-                if (!expectsOperand) throw new ValidationError("Fórmula contém operandos sem operador");
-                expectsOperand = true;
-            } else if (token === ")") {
-                if (expectsOperand) throw new ValidationError("Fórmula contém parênteses vazios ou operador inválido");
-                expectsOperand = false;
-            } else if (expectsOperand) {
-                if (token !== "+" && token !== "-") {
-                    throw new ValidationError("Fórmula contém operador inválido");
-                }
-            } else {
-                expectsOperand = true;
-            }
-        }
-
-        if (expectsOperand) throw new ValidationError("Fórmula não pode terminar com operador");
-    }
+  static validateSyntax(formula) {
+    FormulaEvaluator.parse(formula);
+  }
 }
 
 module.exports = FormulaValidator;
