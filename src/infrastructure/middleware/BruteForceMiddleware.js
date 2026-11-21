@@ -8,16 +8,48 @@ const authConfig = require("../../config/auth");
  * Store em memória para rastreamento de tentativas
  * Em produção, usar Redis
  */
+/**
+ * Normaliza o e-mail da mesma forma que o modelo User (trim + minúsculas),
+ * para que variações de caixa/espaços não criem contadores independentes.
+ */
+function normalizeEmail(email) {
+  return String(email ?? "").trim().toLowerCase();
+}
+
 class BruteForceStore {
   constructor() {
     this.attempts = new Map();
   }
 
   /**
+   * Reserva ATÔMICA de uma tentativa. Como o Node executa este método de forma
+   * síncrona, requisições simultâneas não ultrapassam o limite enquanto o
+   * bcrypt ainda está comparando a senha. Mantém a semântica sequencial:
+   * a tentativa só é recusada quando o contador já excede o limite.
+   */
+  reserveAttempt(email) {
+    if (this.isBlocked(email)) return { allowed: false };
+    const { attempts } = this.recordAttempt(email);
+    return { allowed: true, attempts };
+  }
+
+  /**
+   * Devolve uma reserva quando a tentativa falhou por motivo que não é
+   * credencial inválida (ex.: indisponibilidade do banco).
+   */
+  releaseAttempt(email) {
+    const key = `login:${normalizeEmail(email)}`;
+    const record = this.attempts.get(key);
+    if (!record) return;
+    record.count -= 1;
+    if (record.count <= 0) this.attempts.delete(key);
+  }
+
+  /**
    * Registrar tentativa de login para um email
    */
   recordAttempt(email) {
-    const key = `login:${email}`;
+    const key = `login:${normalizeEmail(email)}`;
     const now = Date.now();
     const record = this.attempts.get(key) || {
       count: 0,
@@ -43,14 +75,14 @@ class BruteForceStore {
    * Resetar tentativas (login bem-sucedido)
    */
   resetAttempts(email) {
-    this.attempts.delete(`login:${email}`);
+    this.attempts.delete(`login:${normalizeEmail(email)}`);
   }
 
   /**
    * Verificar se está bloqueado
    */
   isBlocked(email) {
-    const key = `login:${email}`;
+    const key = `login:${normalizeEmail(email)}`;
     const record = this.attempts.get(key);
 
     if (!record) return false;
@@ -68,7 +100,7 @@ class BruteForceStore {
    * Obter tempo restante de bloqueio (em minutos)
    */
   getRemainingLockTime(email) {
-    const key = `login:${email}`;
+    const key = `login:${normalizeEmail(email)}`;
     const record = this.attempts.get(key);
 
     if (!record) return 0;
@@ -136,6 +168,20 @@ function bruteForceMiddleware(req, res, next) {
 }
 
 /**
+ * Reservar atomicamente uma tentativa de login (antes de validar a senha).
+ */
+function reserveLoginAttempt(email) {
+  return bruteForceStore.reserveAttempt(email).allowed;
+}
+
+/**
+ * Liberar reserva por falha que não é credencial inválida.
+ */
+function releaseLoginAttempt(email) {
+  bruteForceStore.releaseAttempt(email);
+}
+
+/**
  * Registrar tentativa falhada
  */
 function recordFailedAttempt(email) {
@@ -160,7 +206,10 @@ function isAccountBlocked(email) {
 module.exports = {
   bruteForceMiddleware,
   recordFailedAttempt,
+  reserveLoginAttempt,
+  releaseLoginAttempt,
   resetAttempts,
   isAccountBlocked,
+  normalizeEmail,
   BruteForceStore,
 };

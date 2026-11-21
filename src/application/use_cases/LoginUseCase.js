@@ -7,9 +7,9 @@ const {
   InvalidPasswordError,
 } = require("../errors/AuthErrors");
 const {
-  recordFailedAttempt,
+  reserveLoginAttempt,
+  releaseLoginAttempt,
   resetAttempts,
-  isAccountBlocked,
 } = require("../../infrastructure/middleware/BruteForceMiddleware");
 const {
   ValidationError,
@@ -32,29 +32,46 @@ class LoginUseCase {
       throw new ValidationError("E-mail e senha são obrigatórios");
     }
 
-    // Verificar se conta está bloqueada por brute force
-    if (isAccountBlocked(email)) {
+    // Reserva atômica da tentativa ANTES de qualquer operação assíncrona:
+    // tentativas simultâneas não escapam do limite durante o bcrypt.
+    if (!reserveLoginAttempt(email)) {
       throw new UserBlockedError();
     }
 
-    // Buscar usuário
-    const user = await this.userUseCases.getUserByEmail(email);
-    if (!user) {
-      recordFailedAttempt(email);
-      throw new UserNotFoundError();
-    }
+    // A reserva conta como tentativa falha, exceto em erros que não são
+    // credencial inválida (ex.: banco indisponível), que são devolvidos.
+    let credentialFailure = false;
+    const failCredential = (error) => {
+      credentialFailure = true;
+      return error;
+    };
 
-    // Verificar se usuário está ativo
-    if (user.ativo === false) {
-      recordFailedAttempt(email);
-      throw new AuthenticationError("Esta conta está inativa", "USER_INACTIVE");
-    }
+    let user;
+    try {
+      // Buscar usuário
+      user = await this.userUseCases.getUserByEmail(email);
+      if (!user) {
+        throw failCredential(new UserNotFoundError());
+      }
 
-    // Validar senha
-    const senhaValida = await this.passwordHasher.compare(senha, user.senhaHash || user.senha);
-    if (!senhaValida) {
-      recordFailedAttempt(email);
-      throw new InvalidPasswordError();
+      // Verificar se usuário está ativo
+      if (user.ativo === false) {
+        throw failCredential(
+          new AuthenticationError("Esta conta está inativa", "USER_INACTIVE"),
+        );
+      }
+
+      // Validar senha
+      const senhaValida = await this.passwordHasher.compare(
+        senha,
+        user.senhaHash || user.senha,
+      );
+      if (!senhaValida) {
+        throw failCredential(new InvalidPasswordError());
+      }
+    } catch (error) {
+      if (!credentialFailure) releaseLoginAttempt(email);
+      throw error;
     }
 
     // Login bem-sucedido
