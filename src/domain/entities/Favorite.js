@@ -15,8 +15,10 @@ const FavoriteSchema = new Schema(
       index: true,
     },
     resourceId: {
-      type: Schema.Types.ObjectId,
+      type: String,
       required: true,
+      trim: true,
+      maxlength: 120,
       index: true,
     },
     resourceType: {

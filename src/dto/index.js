@@ -5,8 +5,126 @@
 
 const { ValidationError } = require("../errors/AppError");
 
-// Importar validação de formula para funções personalizadas
+// Importar validação e avaliação segura de formula para funções personalizadas
 const FormulaValidator = require("../../src/application/validators/FormulaValidator");
+const FormulaEvaluator = require("../../src/application/services/FormulaEvaluator");
+
+const VALID_CUSTOM_FUNCTION_CATEGORIES = [
+  "matematica",
+  "fisica",
+  "quimica",
+  "financeira",
+  "outro",
+];
+const MAX_METADATA_BYTES = 2048;
+const RESERVED_METADATA_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function validateMetadataNode(value, seen) {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      throw new ValidationError("metadata contém número não finito");
+    }
+    return;
+  }
+  if (value === undefined) return;
+  if (typeof value !== "object") {
+    throw new ValidationError("metadata contém tipo não serializável");
+  }
+  if (seen.has(value)) {
+    throw new ValidationError("metadata contém referência circular");
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      validateMetadataNode(item, seen);
+    }
+    return;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new ValidationError("metadata deve conter apenas objetos planos");
+  }
+  for (const key of Object.getOwnPropertyNames(value)) {
+    if (RESERVED_METADATA_KEYS.has(key)) {
+      throw new ValidationError(`metadata contém chave reservada não permitida: ${key}`);
+    }
+    validateMetadataNode(value[key], seen);
+  }
+}
+
+function validatePlainMetadata(metadata) {
+  if (metadata === null || typeof metadata !== "object" || Array.isArray(metadata)) {
+    throw new ValidationError("metadata deve ser um objeto plano");
+  }
+  const proto = Object.getPrototypeOf(metadata);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new ValidationError("metadata deve ser um objeto plano");
+  }
+  validateMetadataNode(metadata, new WeakSet());
+
+  let serialized;
+  try {
+    serialized = JSON.stringify(metadata);
+  } catch {
+    throw new ValidationError("metadata não é serializável");
+  }
+  if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > MAX_METADATA_BYTES) {
+    throw new ValidationError("metadata excede o limite de 2KB");
+  }
+}
+
+function validateOptionalDescricao(descricao) {
+  if (descricao === undefined) return undefined;
+  if (typeof descricao !== "string") {
+    throw new ValidationError("Descrição deve ser uma string");
+  }
+  const trimmed = descricao.trim();
+  if (trimmed.length > 500) {
+    throw new ValidationError("Descrição deve ter no máximo 500 caracteres");
+  }
+  return trimmed;
+}
+
+function validateCustomFunctionName(nome) {
+  if (
+    typeof nome !== "string" ||
+    nome.trim().length < 3 ||
+    nome.trim().length > 100
+  ) {
+    throw new ValidationError("Nome deve ter entre 3 e 100 caracteres");
+  }
+  return nome.trim();
+}
+
+function validateCustomFunctionType(tipo) {
+  if (
+    typeof tipo !== "string" ||
+    !tipo.trim() ||
+    tipo.trim().length > 60
+  ) {
+    throw new ValidationError("Tipo inválido");
+  }
+  return tipo.trim();
+}
+
+function validateCustomFunctionTags(tags) {
+  if (!Array.isArray(tags) || tags.length > 20) {
+    throw new ValidationError("tags deve ser uma lista com no máximo 20 itens");
+  }
+  return tags.map((tag) => {
+    if (typeof tag !== "string" || tag.trim().length > 40) {
+      throw new ValidationError("Cada tag deve ser uma string de até 40 caracteres");
+    }
+    return tag.trim();
+  }).filter(Boolean);
+}
 
 // ============================================================================
 // AUTH DTOs
@@ -186,15 +304,35 @@ class HistoricoResponseDTO {
 // ============================================================================
 
 class CreateFavoriteDTO {
-  constructor(data) {
-    this.resourceId = data.resourceId;
-    this.resourceType = data.resourceType;
-    this.nome = data.nome;
-    this.descricao = data.descricao;
+  constructor(data = {}) {
+    const payload = data && typeof data === "object" ? data : {};
+    this.resourceId = payload.resourceId;
+    this.resourceType = payload.resourceType;
+    this.nome = payload.nome;
+    this.descricao = payload.descricao;
+    this.metadata = payload.metadata;
   }
 
   validate() {
-    if (!this.resourceId) throw new ValidationError("resourceId é obrigatório");
+    if (typeof this.resourceId !== "string") {
+      if (
+        this.resourceId &&
+        typeof this.resourceId === "object" &&
+        typeof this.resourceId.toHexString === "function" &&
+        /^[a-fA-F0-9]{24}$/.test(this.resourceId.toHexString())
+      ) {
+        this.resourceId = this.resourceId.toHexString();
+      } else {
+        throw new ValidationError("resourceId é obrigatório e deve ser uma string");
+      }
+    }
+    this.resourceId = this.resourceId.trim();
+    if (!this.resourceId || !/^[a-zA-Z0-9:_-]{1,120}$/.test(this.resourceId)) {
+      throw new ValidationError(
+        "resourceId inválido (use de 1 a 120 caracteres: letras, números, ':', '_' ou '-')",
+      );
+    }
+
     if (
       !this.resourceType ||
       !["custom-function", "calculation", "iot-device"].includes(
@@ -205,17 +343,40 @@ class CreateFavoriteDTO {
         "resourceType inválido (custom-function, calculation, iot-device)",
       );
     }
-    if (!this.nome) throw new ValidationError("Nome é obrigatório");
+
+    if (
+      typeof this.nome !== "string" ||
+      !this.nome.trim() ||
+      this.nome.trim().length > 120
+    ) {
+      throw new ValidationError(
+        "Nome é obrigatório e deve ter no máximo 120 caracteres",
+      );
+    }
+    this.nome = this.nome.trim();
+
+    if (this.descricao !== undefined) {
+      this.descricao = validateOptionalDescricao(this.descricao);
+    }
+
+    if (this.metadata !== undefined) {
+      validatePlainMetadata(this.metadata);
+    }
   }
 }
 
 class FavoriteResponseDTO {
   constructor(favorite) {
-    this.id = favorite._id;
-    this.resourceId = favorite.resourceId;
+    this.id = favorite._id
+      ? String(favorite._id)
+      : favorite.id
+        ? String(favorite.id)
+        : undefined;
+    this.resourceId = String(favorite.resourceId);
     this.resourceType = favorite.resourceType;
     this.nome = favorite.nome;
     this.descricao = favorite.descricao;
+    if (favorite.metadata !== undefined) this.metadata = favorite.metadata;
     this.criadoEm = favorite.criadoEm;
   }
 }
@@ -225,63 +386,131 @@ class FavoriteResponseDTO {
 // ============================================================================
 
 class CreateCustomFunctionDTO {
-  constructor(data) {
-    this.nome = data.nome;
-    this.categoria = data.categoria;
-    this.tipo = data.tipo;
-    this.parametros = data.parametros || [];
-    this.formula = data.formula;
-    this.tags = data.tags || [];
-    this.publica = data.publica || false;
+  constructor(data = {}) {
+    const payload = data && typeof data === "object" ? data : {};
+    this.nome = payload.nome;
+    this.descricao =
+      payload.descricao === undefined
+        ? undefined
+        : typeof payload.descricao === "string"
+          ? payload.descricao.trim()
+          : payload.descricao;
+    this.categoria = payload.categoria;
+    this.tipo = payload.tipo === undefined ? "formula" : payload.tipo;
+    this.parametros =
+      payload.parametros === undefined ? [] : payload.parametros;
+    this.formula = payload.formula;
+    this.tags = payload.tags === undefined ? [] : payload.tags;
+    this.publica = payload.publica === undefined ? false : payload.publica;
   }
 
   validate() {
-    if (!this.nome || this.nome.length < 3) {
-      throw new ValidationError("Nome deve ter pelo menos 3 caracteres");
+    this.nome = validateCustomFunctionName(this.nome);
+    if (this.descricao !== undefined) {
+      this.descricao = validateOptionalDescricao(this.descricao);
     }
+
     if (
       !this.categoria ||
-      !["matematica", "fisica", "quimica", "financeira", "outro"].includes(
-        this.categoria,
-      )
+      !VALID_CUSTOM_FUNCTION_CATEGORIES.includes(this.categoria)
     ) {
       throw new ValidationError("Categoria inválida");
     }
-    if (!this.tipo) throw new ValidationError("Tipo é obrigatório");
-    
+
+    this.tipo = validateCustomFunctionType(this.tipo);
+
+    FormulaEvaluator.validateParametersList(this.parametros);
+
+    this.tags = validateCustomFunctionTags(this.tags);
+    if (typeof this.publica !== "boolean") {
+      throw new ValidationError("publica deve ser booleano");
+    }
+
     FormulaValidator.validate(this.formula, this.parametros);
   }
 }
 
 class UpdateCustomFunctionDTO {
-  constructor(data) {
-    this.nome = data.nome;
-    this.categoria = data.categoria;
-    this.parametros = data.parametros;
-    this.formula = data.formula;
-    this.tags = data.tags;
-    this.publica = data.publica;
+  constructor(data = {}) {
+    const payload = data && typeof data === "object" ? data : {};
+    this.nome = payload.nome;
+    this.descricao = payload.descricao;
+    this.categoria = payload.categoria;
+    this.tipo = payload.tipo;
+    this.parametros = payload.parametros;
+    this.formula = payload.formula;
+    this.tags = payload.tags;
+    this.publica = payload.publica;
   }
 
   validate() {
-    if (this.nome && this.nome.length < 3) {
-      throw new ValidationError("Nome deve ter pelo menos 3 caracteres");
+    if (this.nome !== undefined) {
+      this.nome = validateCustomFunctionName(this.nome);
     }
+
+    if (this.descricao !== undefined) {
+      this.descricao = validateOptionalDescricao(this.descricao);
+    }
+
     if (
-      this.categoria &&
-      !["matematica", "fisica", "quimica", "financeira", "outro"].includes(
-        this.categoria,
-      )
+      this.categoria !== undefined &&
+      !VALID_CUSTOM_FUNCTION_CATEGORIES.includes(this.categoria)
     ) {
       throw new ValidationError("Categoria inválida");
     }
+
+    if (this.tipo !== undefined) {
+      this.tipo = validateCustomFunctionType(this.tipo);
+    }
+
+    if (this.parametros !== undefined) {
+      FormulaEvaluator.validateParametersList(this.parametros);
+    }
+
+    if (this.formula !== undefined && this.parametros !== undefined) {
+      FormulaValidator.validate(this.formula, this.parametros);
+    } else if (this.formula !== undefined) {
+      FormulaEvaluator.parse(this.formula);
+    }
+
+    if (this.tags !== undefined) {
+      this.tags = validateCustomFunctionTags(this.tags);
+    }
+
+    if (this.publica !== undefined && typeof this.publica !== "boolean") {
+      throw new ValidationError("publica deve ser booleano");
+    }
+  }
+
+  toUpdateData() {
+    const update = {};
+    for (const key of [
+      "nome",
+      "descricao",
+      "categoria",
+      "tipo",
+      "parametros",
+      "formula",
+      "tags",
+      "publica",
+    ]) {
+      if (this[key] !== undefined) {
+        update[key] = this[key];
+      }
+    }
+    return update;
   }
 }
 
 class CustomFunctionResponseDTO {
   constructor(func) {
-    this.id = func._id;
+    this.id = func._id
+      ? String(func._id)
+      : func.id
+        ? String(func.id)
+        : undefined;
     this.nome = func.nome;
+    this.descricao = func.descricao || "";
     this.categoria = func.categoria;
     this.tipo = func.tipo;
     this.parametros = func.parametros;
@@ -291,6 +520,7 @@ class CustomFunctionResponseDTO {
     this.favoritos = func.favoritos || 0;
     this.usos = func.usos || 0;
     this.criadoEm = func.criadoEm;
+    this.atualizadoEm = func.atualizadoEm;
   }
 }
 
