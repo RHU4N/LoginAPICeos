@@ -12,7 +12,9 @@ const {
 } = require("../../domain/entities/IoTPlatform");
 const Measurement = require("../../domain/entities/IoTMeasurement");
 const { AppError } = require("../../errors/AppError");
+const { IoTClaims } = require("../../application/use_cases/IoTClaims");
 const platform = new IoTPlatform();
+const claims = new IoTClaims(platform);
 const run =
   (fn, status = 200) =>
   async (req, res, next) => {
@@ -51,6 +53,25 @@ router.post(
     }
   },
   run((req) => platform.pair(req.body || {})),
+);
+// Associação por código temporário (dispositivo sem credencial -> usuário confirma no app).
+router.post(
+  "/device/claim",
+  run((req) => claims.start(req.body || {}, req.ip), 201),
+);
+router.post(
+  "/device/claim/poll",
+  run((req) => claims.poll(req.body || {})),
+);
+router.post(
+  "/claims/lookup",
+  auth,
+  run((req) => claims.lookup(req.userId, req.body?.code)),
+);
+router.post(
+  "/claims/confirm",
+  auth,
+  run((req) => claims.confirm(req.userId, req.body || {}), 201),
 );
 router.get(
   "/device/commands",

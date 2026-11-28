@@ -110,7 +110,40 @@ const rateSchema = new Schema(
   { collection: "iot-rate-limits" },
 );
 rateSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Associação iniciada pelo dispositivo: ele exibe um código curto e o usuário o confirma no app.
+// Código e segredo de consulta são guardados somente como hash.
+const claimSchema = new Schema(
+  {
+    claimId: { type: String, unique: true, required: true },
+    codeHash: { type: String, unique: true, required: true, select: false },
+    pollHash: { type: String, required: true, select: false },
+    status: { type: String, default: "PENDING" },
+    nomeSugerido: String,
+    tipoDispositivo: String,
+    fabricante: String,
+    modelo: String,
+    hardwareId: String,
+    sensores: [
+      { _id: false, sensorId: String, nome: String, tipo: String, unidade: String },
+    ],
+    capacidades: {
+      supportsPush: Boolean,
+      supportsOnDemand: Boolean,
+      supportsCommandPolling: Boolean,
+      supportsMultipleSensors: Boolean,
+    },
+    ownerId: { type: Schema.Types.ObjectId, index: true },
+    deviceId: String,
+    expiresAt: { type: Date, required: true },
+    approvedAt: Date,
+    consumedAt: Date,
+    purgeAt: { type: Date, required: true },
+  },
+  { collection: "iot-device-claims", timestamps: true },
+);
+claimSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
 module.exports = {
+  Claim: mongoose.model("IoTDeviceClaim", claimSchema),
   Device: mongoose.model("IoTDevice", deviceSchema),
   ReadRequest: mongoose.model("IoTReadRequest", requestSchema),
   Notification: mongoose.model("UserNotification", notificationSchema),
