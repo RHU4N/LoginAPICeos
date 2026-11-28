@@ -63,6 +63,26 @@ concorrentes, persistência parcial, conflito, isolamento, health interno e chav
 legadas. Nunca utiliza o MongoDB Atlas de produção para limpeza ou falhas injetadas.
 O teste com Azure Functions host e Azurite está em `ceos-mensageria/functions`.
 
+## Associação de dispositivos por código temporário
+
+Fluxo padrão desde 28/11/2026 (o cadastro manual com `provisioningToken` continua disponível para desenvolvimento):
+
+| Passo | Quem | Endpoint | Autenticação |
+|---|---|---|---|
+| 1 | Dispositivo sem credencial | `POST /iot/device/claim` (sensores, capacidades, modelo, hardwareId) → `pairingCode` `XXXX-XXXX`, `claimId`, `pollSecret` | nenhuma; limite por IP |
+| 2 | Usuário (Web/Mobile) | `POST /iot/claims/lookup {code}` → dados do equipamento e dispositivos da própria conta que podem ser reconectados | JWT |
+| 3 | Usuário | `POST /iot/claims/confirm {code, nome, deviceId?}` → novo dispositivo ou reconexão (mesmo `deviceId`, histórico preservado) | JWT |
+| 4 | Dispositivo | `POST /iot/device/claim/poll {claimId, pollSecret}` → `PENDING` ou, uma única vez, `deviceId` + `deviceToken` | `pollSecret` |
+
+Regras: código de 8 caracteres sem 0/O/1/I/L, válido por 10 min, uso único; código e `pollSecret` só como hash
+(`iot-device-claims`, removidos por TTL). Não existe lista global de dispositivos: o código é o único meio de
+identificar o equipamento. Reconexão só para dispositivos da mesma conta e com os mesmos sensores; a credencial
+anterior deixa de valer na confirmação. "Desconectar" (`/revoke`) e "Remover" (`/unlink`) preservam o histórico.
+
+`GET /iot/devices` passa a informar `ultimaMedicao` e `conexao`: `CONECTADO`, `AGUARDANDO_MEDICOES`,
+`DESCONECTADO` (sem contato há mais de `CEOS_IOT_ONLINE_SECONDS`, padrão 600), `AGUARDANDO_PAREAMENTO`,
+`REVOGADO` ou `HISTORICO`. Testes: `tests/integration/iot-claims.integration.cjs`.
+
 ## Segurança e publicação
 
 O histórico Git contém URIs MongoDB com autenticação em commits antigos, inclusive

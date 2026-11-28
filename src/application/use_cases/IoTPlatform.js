@@ -1,4 +1,5 @@
 const { randomBytes, randomUUID, createHash } = require("node:crypto");
+const mongoose = require("mongoose");
 const {
   Device,
   ReadRequest,
@@ -61,6 +62,60 @@ function stable(value) {
   return value;
 }
 const digest = (value) => hash(JSON.stringify(stable(value)));
+// Valida sensores e capacidades informados no cadastro manual ou pelo próprio dispositivo.
+function deviceSpec(body) {
+  if (
+    !Array.isArray(body.sensores) ||
+    !body.sensores.length ||
+    body.sensores.length > 32
+  )
+    fail("Informe de 1 a 32 sensores.");
+  const sensores = body.sensores.map((s) => {
+    if (
+      !s ||
+      typeof s.sensorId !== "string" ||
+      typeof s.tipo !== "string" ||
+      !ID.test(s.sensorId) ||
+      !ID.test(s.tipo)
+    )
+      fail("Sensor inválido.");
+    return {
+      sensorId: s.sensorId,
+      nome: text(s.nome, 80, true),
+      tipo: s.tipo,
+      unidade: text(s.unidade, 24, true),
+    };
+  });
+  if (new Set(sensores.map((s) => s.sensorId)).size !== sensores.length)
+    fail("Sensores duplicados.");
+  const c = body.capacidades || {};
+  const capacidades = Object.fromEntries(
+    [
+      "supportsPush",
+      "supportsOnDemand",
+      "supportsCommandPolling",
+      "supportsMultipleSensors",
+    ].map((k) => [k, c[k] === true]),
+  );
+  if (
+    !capacidades.supportsPush ||
+    (capacidades.supportsOnDemand && !capacidades.supportsCommandPolling)
+  )
+    fail("HTTP push é necessário; leitura remota exige polling.");
+  return { sensores, capacidades };
+}
+// Estado de conexão exibido igualmente no Web e no Mobile.
+const ONLINE_DEFAULT_SECONDS = 600;
+function connectionState(device, lastMeasurementAt, now = Date.now(), env = process.env) {
+  if (device.status === "ARCHIVED" || device.status === "LEGACY") return "HISTORICO";
+  if (device.status === "PROVISIONING") return "AGUARDANDO_PAREAMENTO";
+  if (device.status === "REVOKED") return "REVOGADO";
+  if (device.status !== "ACTIVE") return "DESCONECTADO";
+  const onlineMs = boundedInt(env.CEOS_IOT_ONLINE_SECONDS, ONLINE_DEFAULT_SECONDS, 60, 86400) * 1000;
+  const contact = Date.parse(device.ultimoContato);
+  if (!Number.isFinite(contact) || now - contact > onlineMs) return "DESCONECTADO";
+  return lastMeasurementAt ? "CONECTADO" : "AGUARDANDO_MEDICOES";
+}
 function clean(document) {
   const result = document.toObject ? document.toObject() : { ...document };
   for (const key of [
@@ -112,44 +167,7 @@ class IoTPlatform {
       })) >= 30
     )
       fail("Limite de dispositivos atingido.", 409);
-    if (
-      !Array.isArray(body.sensores) ||
-      !body.sensores.length ||
-      body.sensores.length > 32
-    )
-      fail("Informe de 1 a 32 sensores.");
-    const sensores = body.sensores.map((s) => {
-      if (
-        !s ||
-        typeof s.sensorId !== "string" ||
-        typeof s.tipo !== "string" ||
-        !ID.test(s.sensorId) ||
-        !ID.test(s.tipo)
-      )
-        fail("Sensor inválido.");
-      return {
-        sensorId: s.sensorId,
-        nome: text(s.nome, 80, true),
-        tipo: s.tipo,
-        unidade: text(s.unidade, 24, true),
-      };
-    });
-    if (new Set(sensores.map((s) => s.sensorId)).size !== sensores.length)
-      fail("Sensores duplicados.");
-    const c = body.capacidades || {};
-    const capacidades = Object.fromEntries(
-      [
-        "supportsPush",
-        "supportsOnDemand",
-        "supportsCommandPolling",
-        "supportsMultipleSensors",
-      ].map((k) => [k, c[k] === true]),
-    );
-    if (
-      !capacidades.supportsPush ||
-      (capacidades.supportsOnDemand && !capacidades.supportsCommandPolling)
-    )
-      fail("HTTP push é necessário; leitura remota exige polling.");
+    const { sensores, capacidades } = deviceSpec(body);
     const provisioningToken = secret();
     const device = await Device.create({
       ownerId: userId,
@@ -813,7 +831,34 @@ class IoTPlatform {
           })),
         });
       }
-    return devices.map(clean);
+    const ownerKey = mongoose.isValidObjectId(userId)
+      ? new mongoose.Types.ObjectId(String(userId))
+      : userId;
+    const last = await Measurement.aggregate([
+      { $match: { userId: ownerKey, deviceId: { $in: devices.map((d) => d.deviceId) } } },
+      { $group: { _id: "$deviceId", at: { $max: "$timestamp" } } },
+    ]);
+    const lastByDevice = new Map(last.map((r) => [r._id, r.at]));
+    const now = Date.now();
+    return devices.map((d) => {
+      const result = clean(d);
+      const ultimaMedicao = lastByDevice.get(d.deviceId) || null;
+      return { ...result, ultimaMedicao, conexao: connectionState(result, ultimaMedicao, now) };
+    });
   }
 }
-module.exports = { IoTPlatform, ACTIVE, clean, digest, readOnceTimings, READ_ONCE_DEFAULTS };
+module.exports = {
+  IoTPlatform,
+  ACTIVE,
+  clean,
+  digest,
+  readOnceTimings,
+  READ_ONCE_DEFAULTS,
+  deviceSpec,
+  connectionState,
+  hash,
+  secret,
+  text,
+  fail,
+  ID,
+};

@@ -7,7 +7,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "lint": "node scripts/check-js.cjs",
-    "test:integration": "node --test tests/integration/iot.integration.cjs tests/integration/iot-platform.integration.cjs tests/integration/iot-cors.integration.cjs tests/integration/iot-readonce-lease.integration.cjs tests/integration/health.integration.cjs tests/integration/favorites-custom-functions.integration.cjs tests/integration/login-bruteforce.integration.cjs"
+    "test:integration": "node --test tests/integration/iot.integration.cjs tests/integration/iot-platform.integration.cjs tests/integration/iot-claims.integration.cjs tests/integration/iot-cors.integration.cjs tests/integration/iot-readonce-lease.integration.cjs tests/integration/health.integration.cjs tests/integration/favorites-custom-functions.integration.cjs tests/integration/login-bruteforce.integration.cjs"
   },
   "keywords": [],
   "author": "",
